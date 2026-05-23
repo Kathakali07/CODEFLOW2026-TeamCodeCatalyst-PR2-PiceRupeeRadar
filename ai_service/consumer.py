@@ -56,10 +56,15 @@ def process_statement(doc_id: str):
         predicted_category = cat_result["predictedCategory"]
         is_anomaly = ml_engine.detect_anomaly(amount)
         
+        # Simple heuristic for recurring payments (EMI, Subscriptions, SIPs, Premiums)
+        recurring_keywords = ["MONTHLY", "SIP", "PREMIUM", "EMI", "SUBSCRIPTION", "NACH", "SI/"]
+        is_recurring = predicted_category in ["EMI", "Subscription"] or any(kw in text for kw in recurring_keywords)
+        
         txn["mlData"] = {
             "predictedCategory": predicted_category,
             "confidenceScore": cat_result["confidenceScore"],
-            "isAnomaly": is_anomaly
+            "isAnomaly": is_anomaly,
+            "isRecurring": is_recurring
         }
         
         if txn_type == "CREDIT":
@@ -73,7 +78,8 @@ def process_statement(doc_id: str):
     summary_metrics = {
         "totalIncome": round(total_income, 2),
         "totalExpense": round(total_expense, 2),
-        "highestCategory": highest_cat
+        "highestCategory": highest_cat,
+        "categoryBreakdown": {k: round(v, 2) for k, v in category_totals.items()}
     }
 
     success = db_helper.update_document_results(doc_id, transactions, summary_metrics)

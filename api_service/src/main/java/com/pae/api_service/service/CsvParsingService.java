@@ -22,17 +22,21 @@ public class CsvParsingService {
         List<Transaction> transactions = new ArrayList<>();
         
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-            String line;
-            boolean firstLine = true;
+            String line = reader.readLine();
+            
+            if (line == null) {
+                throw new IllegalArgumentException("The uploaded CSV file is empty.");
+            }
+            
+            // Basic header validation
+            String[] headers = line.split(",");
+            if (headers.length < 4) {
+                throw new IllegalArgumentException("Invalid CSV format. The file must contain at least 4 columns (Date, Narration, Amount, Type).");
+            }
             
             while ((line = reader.readLine()) != null) {
-                if (firstLine) {
-                    firstLine = false; // Skip CSV header
-                    continue;
-                }
-                
                 String[] columns = line.split(",");
-                // Expecting standard format: Date, Narration, Amount, Type
+                // Skip rows that don't match the expected minimum length
                 if (columns.length < 4) continue; 
                 
                 String date = columns[0].trim();
@@ -41,7 +45,7 @@ public class CsvParsingService {
                 try {
                     amount = Double.parseDouble(columns[2].trim());
                 } catch (NumberFormatException e) {
-                    continue; // Skip invalid rows
+                    continue; // Skip rows where amount is not a number
                 }
                 String type = columns[3].trim().toUpperCase().contains("CR") ? "CREDIT" : "DEBIT";
                 
@@ -57,6 +61,10 @@ public class CsvParsingService {
                 
                 transactions.add(txn);
             }
+        }
+        
+        if (transactions.isEmpty()) {
+            throw new IllegalArgumentException("No valid transactions found in the CSV. Please ensure amounts are numbers and it follows standard layout.");
         }
         
         return transactions;
