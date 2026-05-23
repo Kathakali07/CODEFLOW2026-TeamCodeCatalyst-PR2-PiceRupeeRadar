@@ -5,7 +5,9 @@ import com.pae.api_service.model.Transaction;
 import com.pae.api_service.service.CsvParsingService;
 import com.pae.api_service.service.FirestoreService;
 import com.pae.api_service.service.PubSubProducerService;
+import com.pae.api_service.service.LlmSummaryService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,17 +26,30 @@ public class StatementController {
     private CsvParsingService csvParsingService;
 
     @Autowired
+    private com.pae.api_service.service.PdfParsingService pdfParsingService;
+
+    @Autowired
     private FirestoreService firestoreService;
 
     @Autowired
     private PubSubProducerService pubSubProducerService;
+    
+    @Autowired
+    private LlmSummaryService llmSummaryService;
 
-    // 1. Upload CSV, parse, mask PII, save to DB, and publish to PubSub
+    // 1. Upload Document, parse, mask PII, save to DB, and publish to PubSub
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadStatement(@RequestParam("file") MultipartFile file) {
         try {
-            // 1. Parse & Sanitize
-            List<Transaction> transactions = csvParsingService.parseAndSanitize(file);
+            // 1. Parse & Sanitize based on file type
+            List<Transaction> transactions;
+            String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            
+            if (fileName.endsWith(".pdf") || "application/pdf".equals(file.getContentType())) {
+                transactions = pdfParsingService.parseAndSanitize(file);
+            } else {
+                transactions = csvParsingService.parseAndSanitize(file);
+            }
             
             // 2. Build Document
             String docId = "doc_" + UUID.randomUUID().toString();
@@ -56,25 +71,53 @@ public class StatementController {
             
             return ResponseEntity.ok(response);
             
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
 
-    // 2. Status Polling Endpoint for Frontend
+    // 2. Status Polling Endpoint for Frontend (Now with AI Summary!)
     @GetMapping("/status/{id}")
-    public ResponseEntity<Map<String, String>> getStatus(@PathVariable String id) {
+    public ResponseEntity<?> getStatus(@PathVariable String id) {
         try {
-            StatementDocument doc = firestoreService.getStatement(id);
-            if (doc == null) {
-                return ResponseEntity.notFound().build();
+            StatementDocument document = firestoreService.getStatement(id);
+            if (document == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Document not found");
             }
-            Map<String, String> response = new HashMap<>();
-            response.put("status", doc.getStatus());
+            
+            // Basic response
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", document.getStatus());
+            
+            // If completed, fetch the summary metrics and attach an AI advisor summary!
+            if ("COMPLETED".equals(document.getStatus())) {
+                // Fetch the actual document data directly from Firestore to ensure we have summaryMetrics map
+                var docSnapshot = com.google.cloud.firestore.FirestoreOptions.getDefaultInstance().toBuilder()
+                    .setProjectId("fintech-hackathon")
+                    .setEmulatorHost("127.0.0.1:8080")
+                    .build()
+                    .getService()
+                    .collection("statements")
+                    .document(id)
+                    .get()
+                    .get();
+                    
+                if (docSnapshot.exists() && docSnapshot.contains("summaryMetrics")) {
+                    Map<String, Object> metrics = (Map<String, Object>) docSnapshot.get("summaryMetrics");
+                    response.put("summaryMetrics", metrics);
+                    response.put("aiSummary", llmSummaryService.generateFinancialAdvice(metrics));
+                }
+            }
+            
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error retrieving status");
         }
     }
     
