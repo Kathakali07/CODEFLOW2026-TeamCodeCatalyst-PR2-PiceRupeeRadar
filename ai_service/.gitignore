@@ -1,0 +1,7 @@
+__pycache__
+venv
+model_weights/autoencoder_model.h5
+model_weights/distilbert_tokenizer
+model_weights/distilbert_categorization_model
+model_weights/classes.json
+model_weights/scaler.pkl
