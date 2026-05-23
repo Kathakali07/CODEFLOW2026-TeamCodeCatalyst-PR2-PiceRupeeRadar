@@ -8,11 +8,13 @@ import {
   Dimensions,
   Animated,
   ScrollView,
+  Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowRight,
-  BookOpen,
+  ChevronRight,
   ShieldCheck,
   FileText,
   AlertTriangle,
@@ -75,18 +77,37 @@ export default function WelcomeScreen({ onStart }) {
   ];
 
   return (
-    <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
-      {/* ── HERO BANNER ── */}
-      <LinearGradient
-        colors={['#1e1b4b', '#312e81', '#4f46e5', '#0f172a']}
-        locations={[0, 0.3, 0.65, 1]}
-        style={styles.heroSection}
-      >
-        <SafeAreaView>
+    <View style={styles.container}>
+      {/* ── FIXED TOP NAVBAR ── */}
+      <SafeAreaView style={styles.navbarContainer}>
+        <View style={styles.navbar}>
+          <View style={styles.navbarLeft}>
+            <View style={styles.logoCircle}>
+              <Image
+                source={require('../assets/logo_pr2.jpeg')}
+                style={styles.logoImg}
+              />
+            </View>
+            <Text style={styles.navbarBrand}>PR²</Text>
+          </View>
+
+          <TouchableOpacity style={styles.navActionBtn} onPress={onStart} activeOpacity={0.8}>
+            <Text style={styles.navActionBtnText}>Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
+        {/* ── HERO BANNER ── */}
+        <LinearGradient
+          colors={['#1e1b4b', '#312e81', '#4f46e5', '#0f172a']}
+          locations={[0, 0.3, 0.65, 1]}
+          style={styles.heroSection}
+        >
           <Animated.View style={[styles.heroContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             {/* Heading */}
             <Text style={styles.title}>
-              Drag.Drop.{'\n'}
+              Drag.Drop.{' '}
               <Text style={styles.titleItalic}>Decode.</Text>
             </Text>
 
@@ -103,15 +124,15 @@ export default function WelcomeScreen({ onStart }) {
                 onPress={onStart}
               >
                 <Text style={styles.primaryButtonText}>Open Dashboard</Text>
-                <ArrowRight size={18} color="#7850f0" />
+                <ArrowRight size={18} color="#ffffff" />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secondaryButton}
                 activeOpacity={0.8}
               >
-                <BookOpen size={16} color="rgba(255,255,255,0.8)" />
                 <Text style={styles.secondaryButtonText}>API Docs</Text>
+                <ChevronRight size={16} color="#111111" />
               </TouchableOpacity>
             </View>
 
@@ -121,30 +142,29 @@ export default function WelcomeScreen({ onStart }) {
               <Text style={styles.privacyText}>Privacy-First. No PII leaves the app.</Text>
             </View>
           </Animated.View>
-        </SafeAreaView>
-      </LinearGradient>
+        </LinearGradient>
 
-      {/* ── PRODUCT MOCKUP PREVIEW ── */}
-      <View style={styles.mockupSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionBadge}>LIVE INSIGHTS</Text>
-          <Text style={styles.sectionTitle}>Product Mockup</Text>
-        </View>
-
-        {/* Transaction Mockup Card */}
-        <View style={styles.card}>
-          <View style={styles.statementMeta}>
-            <View style={styles.metaIcon}>
-              <FileText size={18} color="#fff" />
-            </View>
-            <View style={styles.metaTexts}>
-              <Text style={styles.metaTitle}>HDFC Bank Statement</Text>
-              <Text style={styles.metaSubtitle}>Apr 2025 · 312 transactions</Text>
-            </View>
-            <View style={styles.analyzedBadge}>
-              <Text style={styles.analyzedBadgeText}>Analysed</Text>
-            </View>
+        {/* ── PRODUCT MOCKUP PREVIEW ── */}
+        <View style={styles.mockupSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionBadge}>LIVE INSIGHTS</Text>
+            <Text style={styles.sectionTitle}>Product Mockup</Text>
           </View>
+
+          {/* Transaction Mockup Card */}
+          <View style={styles.card}>
+            <View style={styles.statementMeta}>
+              <View style={styles.metaIcon}>
+                <FileText size={18} color="#fff" />
+              </View>
+              <View style={styles.metaTexts}>
+                <Text style={styles.metaTitle}>HDFC Bank Statement</Text>
+                <Text style={styles.metaSubtitle}>Apr 2025 · 312 transactions</Text>
+              </View>
+              <View style={styles.analyzedBadge}>
+                <Text style={styles.analyzedBadgeText}>Analysed</Text>
+              </View>
+            </View>
 
           {[
             { name: 'Swiggy Order', cat: 'Food & Dining', amt: '−₹ 486', color: '#f97316' },
@@ -180,89 +200,151 @@ export default function WelcomeScreen({ onStart }) {
             <Text style={styles.scoreDelta}>▲ 6 pts vs last month</Text>
           </View>
 
-          {/* Anomaly Alert */}
-          <View style={[styles.metricItem, styles.anomalyCard]}>
-            <View style={styles.anomalyHeader}>
-              <AlertTriangle size={14} color="#f97316" />
-              <Text style={styles.anomalyLabel}>Anomaly Flagged</Text>
+            {/* Anomaly Alert */}
+            <View style={[styles.metricItem, styles.anomalyCard]}>
+              <View style={styles.anomalyHeader}>
+                <AlertTriangle size={14} color="#f97316" />
+                <Text style={styles.anomalyLabel}>Anomaly Flagged</Text>
+              </View>
+              <Text style={styles.anomalyTitle}>3× UPI Spike</Text>
+              <Text style={styles.anomalyDesc}>Autoencoder flagged April 18–22</Text>
             </View>
-            <Text style={styles.anomalyTitle}>3× UPI Spike</Text>
-            <Text style={styles.anomalyDesc}>Autoencoder flagged April 18–22</Text>
+          </View>
+
+          {/* Spend Breakdown Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Spend Breakdown</Text>
+            <View style={styles.breakdownList}>
+              {[
+                { label: 'Food & Dining', pct: 38, color: '#f97316' },
+                { label: 'Shopping', pct: 27, color: '#7850f0' },
+                { label: 'Utilities', pct: 20, color: '#0ea5e9' },
+                { label: 'Others', pct: 15, color: '#64748b' },
+              ].map((s, i) => (
+                <View key={i} style={styles.breakdownItem}>
+                  <View style={styles.breakdownMeta}>
+                    <Text style={styles.breakdownLabel}>{s.label}</Text>
+                    <Text style={styles.breakdownPct}>{s.pct}%</Text>
+                  </View>
+                  <View style={styles.breakdownBarBg}>
+                    <View style={[styles.breakdownBarFill, { width: `${s.pct}%`, backgroundColor: s.color }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 
-        {/* Spend Breakdown Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Spend Breakdown</Text>
-          <View style={styles.breakdownList}>
-            {[
-              { label: 'Food & Dining', pct: 38, color: '#f97316' },
-              { label: 'Shopping', pct: 27, color: '#7850f0' },
-              { label: 'Utilities', pct: 20, color: '#0ea5e9' },
-              { label: 'Others', pct: 15, color: '#64748b' },
-            ].map((s, i) => (
-              <View key={i} style={styles.breakdownItem}>
-                <View style={styles.breakdownMeta}>
-                  <Text style={styles.breakdownLabel}>{s.label}</Text>
-                  <Text style={styles.breakdownPct}>{s.pct}%</Text>
+        {/* ── SYSTEM ARCHITECTURE SECTION ── */}
+        <View style={styles.architectureSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionBadge}>UNDER THE HOOD</Text>
+            <Text style={styles.sectionTitle}>Decoupled Architecture</Text>
+            <Text style={styles.sectionDesc}>
+              PR² stands for Pice Rupee Radar. It is an AI-powered financial intelligence platform designed to help users analyze, understand and optimize banking expenses. A distributed microservice architecture decouples ingestion from AI computation.
+            </Text>
+          </View>
+
+          <View style={styles.archGrid}>
+            {architectureDetails.map((service, index) => (
+              <View key={index} style={styles.archCard}>
+                <View style={[styles.archIconContainer, { backgroundColor: service.bg }]}>
+                  {service.icon}
                 </View>
-                <View style={styles.breakdownBarBg}>
-                  <View style={[styles.breakdownBarFill, { width: `${s.pct}%`, backgroundColor: s.color }]} />
+                <View style={styles.archContent}>
+                  <Text style={styles.archTitle}>{service.title}</Text>
+                  <Text style={styles.archDesc}>{service.desc}</Text>
                 </View>
+                <View style={[styles.accentIndicator, { backgroundColor: service.accent }]} />
               </View>
             ))}
           </View>
         </View>
-      </View>
 
-      {/* ── SYSTEM ARCHITECTURE SECTION ── */}
-      <View style={styles.architectureSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionBadge}>UNDER THE HOOD</Text>
-          <Text style={styles.sectionTitle}>Decoupled Architecture</Text>
-          <Text style={styles.sectionDesc}>
-            PR² stands for Pice Rupee Radar. It is an AI-powered financial intelligence platform designed to help users analyze, understand and optimize banking expenses. A distributed microservice architecture decouples ingestion from AI computation.
+        {/* ── FOOTER ── */}
+        <View style={styles.footerSection}>
+          <Text style={styles.footerTitle}>PR²</Text>
+          <Text style={styles.footerDesc}>
+            Pice Rupee Radar — AI-driven financial analysis for bank statements.
           </Text>
+          <Text style={styles.footerCredits}>Engineered by a specialized team of 4.</Text>
         </View>
-
-        <View style={styles.archGrid}>
-          {architectureDetails.map((service, index) => (
-            <View key={index} style={styles.archCard}>
-              <View style={[styles.archIconContainer, { backgroundColor: service.bg }]}>
-                {service.icon}
-              </View>
-              <View style={styles.archContent}>
-                <Text style={styles.archTitle}>{service.title}</Text>
-                <Text style={styles.archDesc}>{service.desc}</Text>
-              </View>
-              <View style={[styles.accentIndicator, { backgroundColor: service.accent }]} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* ── FOOTER ── */}
-      <View style={styles.footerSection}>
-        <Text style={styles.footerTitle}>PR²</Text>
-        <Text style={styles.footerDesc}>
-          Pice Rupee Radar — AI-driven financial analysis for bank statements.
-        </Text>
-        <Text style={styles.footerCredits}>Engineered by a specialized team of 4.</Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  navbarContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ebebeb',
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  navbar: {
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  navbarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderColor: '#e8e6ff',
+    borderWidth: 1.5,
+  },
+  logoImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  navbarBrand: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  navActionBtn: {
+    backgroundColor: '#4f46e5',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  navActionBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
   scrollContainer: {
     flex: 1,
     backgroundColor: '#f8fafc',
   },
   contentContainer: {
+    paddingTop: Platform.OS === 'ios' ? 70 : 80,
     paddingBottom: 80,
   },
   heroSection: {
-    paddingTop: 48,
+    paddingTop: 36,
     paddingBottom: 48,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
@@ -273,10 +355,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#ffffff',
-    fontSize: 44,
+    fontSize: 42,
     fontWeight: '900',
     textAlign: 'center',
-    lineHeight: 52,
+    lineHeight: 50,
     letterSpacing: -1,
     marginBottom: 20,
   },
@@ -285,7 +367,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   description: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#ffffff',
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
@@ -294,34 +376,38 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
     gap: 12,
-    marginBottom: 36,
+    marginBottom: 32,
   },
   primaryButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#7850f0',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
+    shadowColor: '#7850f0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryButtonText: {
-    color: '#4f46e5',
+    color: '#ffffff',
     fontWeight: '800',
     fontSize: 15,
   },
   secondaryButton: {
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 13,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
   },
   secondaryButtonText: {
-    color: '#ffffff',
+    color: '#111111',
     fontWeight: '700',
     fontSize: 15,
   },
