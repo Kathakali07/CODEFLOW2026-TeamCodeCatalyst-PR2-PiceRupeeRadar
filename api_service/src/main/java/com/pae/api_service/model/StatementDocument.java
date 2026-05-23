@@ -26,4 +26,29 @@ public class StatementDocument {
 
     public List<Transaction> getTransactions() { return transactions; }
     public void setTransactions(List<Transaction> transactions) { this.transactions = transactions; }
+
+    // Dynamically computed for the frontend, but NOT saved to the database (Zero Redundancy!)
+    @com.google.cloud.firestore.annotation.Exclude
+    public List<Transaction> getAnomalousTransactions() {
+        if (transactions == null) return null;
+        return transactions.stream()
+                .filter(t -> t.getMlData() != null && Boolean.TRUE.equals(t.getMlData().get("isAnomaly")))
+                .toList();
+    }
+
+    @com.google.cloud.firestore.annotation.Exclude
+    public List<Transaction> getRecurringTransactions() {
+        if (transactions == null) return null;
+        return transactions.stream()
+                .filter(t -> t.getMlData() != null && Boolean.TRUE.equals(t.getMlData().get("isRecurring")))
+                .toList();
+    }
+
+    @com.google.cloud.firestore.annotation.Exclude
+    public Map<String, List<Transaction>> getExpenseBreakdownTransactions() {
+        if (transactions == null) return null;
+        return transactions.stream()
+                .filter(t -> t.getMlData() != null && t.getMlData().get("predictedCategory") != null)
+                .collect(java.util.stream.Collectors.groupingBy(t -> (String) t.getMlData().get("predictedCategory")));
+    }
 }

@@ -9,9 +9,9 @@ from sklearn.preprocessing import LabelEncoder
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 
 # --- 1. CONFIGURATION ---
-# Adjust the dataset paths based on Kaggle's actual input directory structure
-TRAIN_PATH = '/kaggle/input/indian-banking-transaction-text-dataset/financial_transaction_train.csv'
-TEST_PATH = '/kaggle/input/indian-banking-transaction-text-dataset/financial_transaction_test.csv'
+# Updated to read from the newly generated datasets in the working directory
+TRAIN_PATH = '/kaggle/working/financial_transaction_train.csv'
+TEST_PATH = '/kaggle/working/financial_transaction_test.csv'
 MODEL_NAME = 'distilbert-base-uncased'
 MAX_SEQ_LENGTH = 32
 BATCH_SIZE = 16

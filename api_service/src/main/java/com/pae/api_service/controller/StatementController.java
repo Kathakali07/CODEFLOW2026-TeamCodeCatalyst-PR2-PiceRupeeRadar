@@ -37,44 +37,61 @@ public class StatementController {
     @Autowired
     private LlmSummaryService llmSummaryService;
 
-    // 1. Upload Document, parse, mask PII, save to DB, and publish to PubSub
+    // 1. Upload Document (Asynchronous Processing)
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadStatement(@RequestParam("file") MultipartFile file) {
         try {
-            // 1. Parse & Sanitize based on file type
-            List<Transaction> transactions;
-            String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
-            
-            if (fileName.endsWith(".pdf") || "application/pdf".equals(file.getContentType())) {
-                transactions = pdfParsingService.parseAndSanitize(file);
-            } else {
-                transactions = csvParsingService.parseAndSanitize(file);
-            }
-            
-            // 2. Build Document
+            // Read bytes immediately while the request stream is still open
+            final byte[] fileBytes = file.getBytes();
+            final String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            final String contentType = file.getContentType();
+
+            // 1. Build Initial Document
             String docId = "doc_" + UUID.randomUUID().toString();
             StatementDocument document = new StatementDocument();
             document.setId(docId);
             document.setUserId("user_" + UUID.randomUUID().toString().substring(0, 8)); // Mock User ID
-            document.setStatus("PROCESSING");
-            document.setTransactions(transactions);
+            document.setStatus("EXTRACTING_PDF"); // Initial state for Async pipeline
             
-            // 3. Save to Firestore
+            // 2. Save Initial Document to Firestore
             firestoreService.saveStatement(document);
             
-            // 4. Send ID to Python ML Queue
-            pubSubProducerService.dispatchToQueue(docId);
+            // 3. Kick off Async Background Processing
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    List<Transaction> transactions;
+                    if (fileName.endsWith(".pdf") || "application/pdf".equals(contentType)) {
+                        transactions = pdfParsingService.parseAndSanitize(fileBytes);
+                    } else {
+                        transactions = csvParsingService.parseAndSanitize(fileBytes);
+                    }
+                    
+                    // Update document
+                    document.setTransactions(transactions);
+                    document.setStatus("PROCESSING"); // Ready for Python ML
+                    
+                    // Save and Ping Pub/Sub
+                    firestoreService.saveStatement(document);
+                    pubSubProducerService.dispatchToQueue(docId);
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    document.setStatus("FAILED");
+                    try {
+                        firestoreService.saveStatement(document);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            });
             
+            // 4. Return immediately to the frontend!
             Map<String, String> response = new HashMap<>();
             response.put("documentId", docId);
-            response.put("message", "File uploaded and sent for ML analysis!");
+            response.put("message", "File upload received. Extracting data in the background!");
             
             return ResponseEntity.ok(response);
             
-        } catch (IllegalArgumentException e) {
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();

@@ -30,14 +30,16 @@ public class FirestoreService {
         docData.put("status", document.getStatus());
         
         java.util.List<java.util.Map<String, Object>> txnList = new java.util.ArrayList<>();
-        for (com.pae.api_service.model.Transaction txn : document.getTransactions()) {
-            java.util.Map<String, Object> txnData = new java.util.HashMap<>();
-            txnData.put("txnId", txn.getTxnId());
-            txnData.put("date", txn.getDate());
-            txnData.put("rawNarration", txn.getRawNarration());
-            txnData.put("amount", txn.getAmount());
-            txnData.put("type", txn.getType());
-            txnList.add(txnData);
+        if (document.getTransactions() != null) {
+            for (com.pae.api_service.model.Transaction txn : document.getTransactions()) {
+                java.util.Map<String, Object> txnData = new java.util.HashMap<>();
+                txnData.put("txnId", txn.getTxnId());
+                txnData.put("date", txn.getDate());
+                txnData.put("rawNarration", txn.getRawNarration());
+                txnData.put("amount", txn.getAmount());
+                txnData.put("type", txn.getType());
+                txnList.add(txnData);
+            }
         }
         docData.put("transactions", txnList);
 

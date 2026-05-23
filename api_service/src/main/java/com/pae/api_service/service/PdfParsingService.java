@@ -9,7 +9,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -25,9 +24,9 @@ public class PdfParsingService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public List<Transaction> parseAndSanitize(MultipartFile file) throws Exception {
+    public List<Transaction> parseAndSanitize(byte[] fileBytes) throws Exception {
         // 1. Convert PDF to Base64
-        String base64Pdf = Base64.getEncoder().encodeToString(file.getBytes());
+        String base64Pdf = Base64.getEncoder().encodeToString(fileBytes);
 
         // 2. Build Gemini API Request
         String prompt = "You are a financial data extraction AI. Extract all bank transactions from this PDF (which may contain handwriting). " +

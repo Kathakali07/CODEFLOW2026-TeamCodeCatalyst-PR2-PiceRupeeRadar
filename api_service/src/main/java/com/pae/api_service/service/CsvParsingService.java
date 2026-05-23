@@ -2,9 +2,9 @@ package com.pae.api_service.service;
 
 import com.pae.api_service.model.Transaction;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,10 +18,10 @@ public class CsvParsingService {
     // This handles masking Indian Bank account numbers.
     private static final Pattern ACCOUNT_NUM_PATTERN = Pattern.compile("\\b\\d{5,14}(\\d{4})\\b");
     
-    public List<Transaction> parseAndSanitize(MultipartFile file) throws Exception {
+    public List<Transaction> parseAndSanitize(byte[] fileBytes) throws Exception {
         List<Transaction> transactions = new ArrayList<>();
         
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(fileBytes)))) {
             String line = reader.readLine();
             
             if (line == null) {

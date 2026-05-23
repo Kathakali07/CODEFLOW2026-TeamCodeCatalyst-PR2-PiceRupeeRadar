@@ -44,6 +44,8 @@ def process_statement(doc_id: str):
     transactions = doc.get("transactions", [])
     total_income = 0.0
     total_expense = 0.0
+    total_recurring_expense = 0.0
+    anomalies_count = 0
     category_totals = {}
 
     for txn in transactions:
@@ -58,7 +60,7 @@ def process_statement(doc_id: str):
         
         # Simple heuristic for recurring payments (EMI, Subscriptions, SIPs, Premiums)
         recurring_keywords = ["MONTHLY", "SIP", "PREMIUM", "EMI", "SUBSCRIPTION", "NACH", "SI/"]
-        is_recurring = predicted_category in ["EMI", "Subscription"] or any(kw in text for kw in recurring_keywords)
+        is_recurring = predicted_category in ["EMI", "Subscription"] or any(kw in text.upper() for kw in recurring_keywords)
         
         txn["mlData"] = {
             "predictedCategory": predicted_category,
@@ -72,12 +74,30 @@ def process_statement(doc_id: str):
         else:
             total_expense += amount
             category_totals[predicted_category] = category_totals.get(predicted_category, 0) + amount
+            if is_recurring:
+                total_recurring_expense += amount
+        
+        if is_anomaly:
+            anomalies_count += 1
 
     highest_cat = max(category_totals, key=category_totals.get) if category_totals else "None"
+    
+    # Calculate Financial Health Indicator
+    if total_income == 0 and total_expense > 0:
+        health_status = "CRITICAL"
+    elif total_expense > total_income:
+        health_status = "CRITICAL"
+    elif total_expense > (total_income * 0.8):
+        health_status = "WARNING"
+    else:
+        health_status = "GOOD"
     
     summary_metrics = {
         "totalIncome": round(total_income, 2),
         "totalExpense": round(total_expense, 2),
+        "totalRecurringExpense": round(total_recurring_expense, 2),
+        "anomaliesCount": anomalies_count,
+        "financialHealth": health_status,
         "highestCategory": highest_cat,
         "categoryBreakdown": {k: round(v, 2) for k, v in category_totals.items()}
     }
