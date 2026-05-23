@@ -1,6 +1,5 @@
-// src/components/Navbar.jsx
 import React, { useEffect, useState } from 'react';
-import logo from '../assets/logo_pr2.png';
+import logo from '../assets/logo_pr2.jpeg';
 
 export default function Navbar({ onLogin }) {
   const [scrolled, setScrolled] = useState(false);

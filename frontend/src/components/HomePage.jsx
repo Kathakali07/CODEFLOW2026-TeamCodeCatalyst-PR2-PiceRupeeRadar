@@ -249,12 +249,6 @@ export default function HomePage({ onLogin }) {
     },
   ];
 
-  const stats = [
-    { value: '< 2s', label: 'Ingestion latency' },
-    { value: '99.4%', label: 'Categorization accuracy' },
-    { value: '0', label: 'PII data stored' },
-    { value: '12+', label: 'Health metrics generated' },
-  ];
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'DM Sans', sans-serif", color: '#111', overflowX: 'hidden' }}>
@@ -295,24 +289,14 @@ export default function HomePage({ onLogin }) {
 
         {/* Hero content */}
         <div style={{ position: 'relative', zIndex: 2, maxWidth: 800, textAlign: 'center', marginBottom: 64 }}>
-          {/* Pill badge */}
-          <div className="fade-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 999, background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '0.5px solid rgba(255,255,255,0.8)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginBottom: 32, fontSize: 12, fontWeight: 700, color: '#5f3de8', letterSpacing: '0.04em' }}>
-            <span style={{ display: 'flex', position: 'relative' }}>
-              <span style={{ position: 'absolute', inset: 0, borderRadius: 99, background: '#7850f0', opacity: 0.6, animation: 'ping 1.4s cubic-bezier(0,0,0.2,1) infinite' }} />
-              <span style={{ position: 'relative', display: 'block', width: 7, height: 7, borderRadius: 99, background: '#7850f0' }} />
-            </span>
-            PR² Engine v1.0 · Live
-            <style>{`@keyframes ping { 75%,100% { transform: scale(2); opacity: 0; } }`}</style>
-          </div>
 
           <h1 className="fade-up-2" style={{ fontSize: 'clamp(48px,8vw,88px)', fontWeight: 900, lineHeight: 1.04, letterSpacing: '-0.03em', color: '#fff', textShadow: '0 2px 32px rgba(0,0,0,0.18)', marginBottom: 24 }}>
-            Indian bank statements,<br />
-            <span style={{ color: '#fff', opacity: 0.9 }}>decoded </span>
-            <span style={{ fontStyle: 'italic', color: '#fde68a' }}>instantly.</span>
+            Drag.Drop.
+            <span style={{ fontStyle: 'italic', color: '#fde68a' }}>Decode.</span>
           </h1>
 
-          <p className="fade-up-3" style={{ fontSize: 18, lineHeight: 1.7, color: 'rgba(255,255,255,0.88)', maxWidth: 560, margin: '0 auto 40px', fontWeight: 400 }}>
-            Ingest raw CSV or PDF bank statements. Mask PII natively. Deploy decoupled microservices to extract financial health metrics and flag anomalies in milliseconds.
+          <p className="fade-up-3" style={{ fontSize: 18, lineHeight: 1.7, color: 'rgba(255,255,255,1)', maxWidth: 560, margin: '0 auto 40px', fontWeight: 400 }}>
+            Securely process CSV and PDF statements, anonymize sensitive information, uncover spending patterns and flag suspicious activity within milliseconds.Transform static bank statements into live financial insights with AI-driven analysis.
           </p>
 
           <div className="fade-up-4" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -351,7 +335,8 @@ export default function HomePage({ onLogin }) {
               Decoupled microservice<br />architecture
             </h2>
             <p style={{ fontSize: 17, color: '#555', lineHeight: 1.7, fontWeight: 400 }}>
-              Designed strictly for high availability and fault tolerance. PR² separates ingestion from computationally heavy ML executions — so a spike in uploads never stalls your analysis.
+              PR² stands for Pice Rupee Radar. It is an AI-powered financial intelligence platform designed to help users analyze, understand and optimize their banking expenses effortlessly.
+              A distributed microservice architecture that decouples data ingestion from AI computation, enabling low-latency financial analysis without bottlenecks.
             </p>
           </div>
 
@@ -372,31 +357,7 @@ export default function HomePage({ onLogin }) {
             ))}
           </div>
 
-          {/* Flow diagram */}
-          <div style={{ marginTop: 56, padding: '32px 36px', background: '#0c0a1a', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, overflowX: 'auto' }}>
-            {['CSV / PDF Upload', 'PII Masking', 'RabbitMQ Queue', 'NER + Autoencoder', 'Health Report'].map((step, i, arr) => (
-              <React.Fragment key={i}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 110 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 12,
-                    background: ['#7850f0', '#0ea5e9', '#f97316', '#d946ef', '#059669'][i] + '22',
-                    border: `1.5px solid ${['#7850f0', '#0ea5e9', '#f97316', '#d946ef', '#059669'][i]}55`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {[<FileText size={16} />, <ShieldCheck size={16} />, <Zap size={16} />, <BrainCircuit size={16} />, <BarChart2 size={16} />][i]}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>{step}</div>
-                </div>
-                {i < arr.length - 1 && (
-                  <div style={{ width: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
-                    <svg width="24" height="10" viewBox="0 0 24 10" fill="none">
-                      <path d="M0 5H20M20 5L16 1M20 5L16 9" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+          
         </div>
       </section>
 
@@ -425,7 +386,7 @@ export default function HomePage({ onLogin }) {
             <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.04em', color: '#111', marginBottom: 8 }}>
               PR<sup style={{ color: '#7850f0', fontSize: 16, verticalAlign: 'super' }}>2</sup>
             </div>
-            <div style={{ fontSize: 13, color: '#888', maxWidth: 220, lineHeight: 1.6 }}>Pice Rupee Radar — AI-driven financial analysis for Indian bank statements.</div>
+            <div style={{ fontSize: 13, color: '#888', maxWidth: 220, lineHeight: 1.6 }}>Pice Rupee Radar — AI-driven financial analysis for bank statements.</div>
             <div style={{ marginTop: 14, fontSize: 12, color: '#bbb' }}>Engineered by a specialized team of 4.</div>
           </div>
 
