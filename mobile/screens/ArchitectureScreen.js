@@ -46,19 +46,14 @@ export default function ArchitectureScreen() {
     },
   ];
 
-  const flowchartSteps = [
-    { label: 'CSV / PDF Upload', desc: 'Secure local statement read', icon: <FileText size={16} color="#7850f0" />, bg: '#f5f3ff', accent: '#7850f0' },
-    { label: 'PII Masking', desc: 'Regex filter wipes sensitive data', icon: <ShieldCheck size={16} color="#0ea5e9" />, bg: '#f0f9ff', accent: '#0ea5e9' },
-    { label: 'RabbitMQ Queue', desc: 'Saves statement in queue', icon: <Zap size={16} color="#f97316" />, bg: '#fff7ed', accent: '#f97316' },
-    { label: 'NER + Autoencoder', desc: 'BiLSTM categorizes transactions', icon: <BrainCircuit size={16} color="#d946ef" />, bg: '#fdf2ff', accent: '#d946ef' },
-    { label: 'Health Report', desc: 'Results saved to MongoDB', icon: <BarChart2 size={16} color="#059669" />, bg: '#ecfdf5', accent: '#059669' },
-  ];
-
   return (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>System Architecture</Text>
-        <Text style={styles.headerSubtitle}>Decoupled, Event-Driven Microservices</Text>
+        <Text style={styles.underHood}>UNDER THE HOOD</Text>
+        <Text style={styles.headerTitle}>Decoupled Microservice Architecture</Text>
+        <Text style={styles.headerDesc}>
+          PR² stands for Pice Rupee Radar. It is an AI-powered financial intelligence platform designed to help users analyze, understand and optimize their banking expenses effortlessly. A distributed microservice architecture that decouples data ingestion from AI computation, enabling low-latency financial analysis without bottlenecks.
+        </Text>
       </View>
 
       {/* Cards List */}
@@ -76,37 +71,6 @@ export default function ArchitectureScreen() {
           </View>
         ))}
       </View>
-
-      {/* Flowchart Diagram */}
-      <View style={styles.flowchartSection}>
-        <Text style={styles.flowchartTitle}>Ingestion Pipeline Flow</Text>
-        <Text style={styles.flowchartSubtitle}>From Statement Upload to ML Insights</Text>
-
-        <View style={styles.flowContainer}>
-          {flowchartSteps.map((step, idx) => (
-            <React.Fragment key={idx}>
-              <View style={styles.flowStepRow}>
-                {/* Left side: Icon inside node */}
-                <View style={[styles.stepIconContainer, { backgroundColor: step.bg, borderColor: step.accent }]}>
-                  {step.icon}
-                </View>
-                {/* Right side: Texts */}
-                <View style={styles.stepTexts}>
-                  <Text style={styles.stepName}>{step.label}</Text>
-                  <Text style={styles.stepDesc}>{step.desc}</Text>
-                </View>
-              </View>
-
-              {idx < flowchartSteps.length - 1 && (
-                <View style={styles.connectorContainer}>
-                  <View style={styles.connectorLine} />
-                  <ChevronDown size={14} color="#cbd5e1" style={styles.connectorArrow} />
-                </View>
-              )}
-            </React.Fragment>
-          ))}
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -122,7 +86,14 @@ const styles = StyleSheet.create({
   },
   header: {
     marginTop: 24,
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  underHood: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7850f0',
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 22,
@@ -130,11 +101,12 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     letterSpacing: -0.5,
   },
-  headerSubtitle: {
+  headerDesc: {
     fontSize: 13,
     color: '#64748b',
-    marginTop: 2,
-    fontWeight: '500',
+    marginTop: 12,
+    lineHeight: 18,
+    fontWeight: '400',
   },
   grid: {
     gap: 16,
@@ -179,77 +151,5 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 4,
-  },
-  flowchartSection: {
-    backgroundColor: '#0c0a1a',
-    borderRadius: 24,
-    padding: 24,
-  },
-  flowchartTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  flowchartSubtitle: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 4,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontWeight: '600',
-  },
-  flowContainer: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  flowStepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    gap: 16,
-  },
-  stepIconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepTexts: {
-    flex: 1,
-  },
-  stepName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  stepDesc: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 2,
-  },
-  connectorContainer: {
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  connectorLine: {
-    position: 'absolute',
-    width: 1.5,
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  connectorArrow: {
-    zIndex: 1,
-    backgroundColor: '#0c0a1a',
-    paddingVertical: 2,
   },
 });
