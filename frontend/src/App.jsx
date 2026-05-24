@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
-import Dashboard from './components/Dashboard';
+import Dashboard from './components/DashBoard';
 
 export default function App() {
   const [tokenData, setTokenData] = useState(() => {
