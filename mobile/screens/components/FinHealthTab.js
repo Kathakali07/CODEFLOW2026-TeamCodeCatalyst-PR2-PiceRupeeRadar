@@ -30,60 +30,56 @@ export default function FinHealthTab({ summaryMetrics = {}, aiSummaryText = '', 
           </View>
         </View>
 
-        {aiSummaryText ? (
-          <View style={styles.aiSummaryCard}>
-            <View style={styles.aiSummaryHeader}>
-              <BrainCircuit size={16} color="#4f46e5" />
-              <Text style={styles.aiSummaryTitle}>Gemini AI Advisor Insight</Text>
-            </View>
-            <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
-          </View>
-        ) : null}
-
-        {/* ── AI CHAT INTERFACE ── */}
-        <View style={styles.chatContainer}>
-          <View style={styles.chatHeader}>
-            <BrainCircuit size={18} color="#4f46e5" />
-            <Text style={styles.chatTitle}>Ask Gemini AI</Text>
+        {/* ── UNIFIED GEMINI AI CARD ── */}
+        <View style={styles.aiSummaryCard}>
+          <View style={styles.aiSummaryHeader}>
+            <BrainCircuit size={16} color="#4f46e5" />
+            <Text style={styles.aiSummaryTitle}>Gemini AI Advisor Insight</Text>
           </View>
           
-          <ScrollView 
-            style={styles.chatHistoryScroll}
-            ref={scrollViewRef}
-            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          >
-            {chatHistory.map((msg, idx) => (
-              <View key={idx} style={[styles.chatBubble, msg.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAI]}>
-                {msg.role === 'assistant' || msg.role === 'model' ? (
-                  <Markdown style={markdownStyles}>{msg.content}</Markdown>
-                ) : (
-                  <Text style={styles.chatBubbleTextUser}>{msg.content}</Text>
-                )}
-              </View>
-            ))}
-            {isChatLoading && (
-              <View style={[styles.chatBubble, styles.chatBubbleAI, { width: 50, alignItems: 'center' }]}>
-                <ActivityIndicator size="small" color="#4f46e5" />
-              </View>
-            )}
-          </ScrollView>
+          {aiSummaryText ? (
+            <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
+          ) : null}
 
-          <View style={styles.chatInputRow}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder="Ask about your finances..."
-              placeholderTextColor="#94a3b8"
-              value={chatMessage}
-              onChangeText={setChatMessage}
-              onSubmitEditing={handleSendChat}
-            />
-            <TouchableOpacity 
-              style={[styles.chatSendBtn, !chatMessage.trim() && { opacity: 0.5 }]} 
-              onPress={handleSendChat}
-              disabled={!chatMessage.trim() || isChatLoading}
+          <View style={styles.chatContainer}>
+            <ScrollView 
+              style={styles.chatHistoryScroll}
+              ref={scrollViewRef}
+              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
             >
-              <Send size={16} color="#ffffff" />
-            </TouchableOpacity>
+              {chatHistory.map((msg, idx) => (
+                <View key={idx} style={[styles.chatBubble, msg.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAI]}>
+                  {msg.role === 'assistant' || msg.role === 'model' ? (
+                    <Markdown style={markdownStyles}>{msg.content}</Markdown>
+                  ) : (
+                    <Text style={styles.chatBubbleTextUser}>{msg.content}</Text>
+                  )}
+                </View>
+              ))}
+              {isChatLoading && (
+                <View style={[styles.chatBubble, styles.chatBubbleAI, { width: 50, alignItems: 'center' }]}>
+                  <ActivityIndicator size="small" color="#4f46e5" />
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.chatInputRow}>
+              <TextInput
+                style={styles.chatInput}
+                placeholder="Ask about your finances..."
+                placeholderTextColor="#94a3b8"
+                value={chatMessage}
+                onChangeText={setChatMessage}
+                onSubmitEditing={handleSendChat}
+              />
+              <TouchableOpacity 
+                style={[styles.chatSendBtn, !chatMessage.trim() && { opacity: 0.5 }]} 
+                onPress={handleSendChat}
+                disabled={!chatMessage.trim() || isChatLoading}
+              >
+                <Send size={16} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -271,13 +267,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   chatContainer: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e8f0',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    minHeight: 250,
+    paddingTop: 16,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#c7d2fe',
   },
   chatHeader: {
     flexDirection: 'row',
