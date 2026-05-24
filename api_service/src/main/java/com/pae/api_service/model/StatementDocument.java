@@ -7,6 +7,7 @@ public class StatementDocument {
     private String id;
     private String userId;
     private String status;
+    private String statementMonth;
     private Map<String, Object> summaryMetrics;
     private List<Transaction> transactions;
 
@@ -20,6 +21,9 @@ public class StatementDocument {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getStatementMonth() { return statementMonth; }
+    public void setStatementMonth(String statementMonth) { this.statementMonth = statementMonth; }
 
     public Map<String, Object> getSummaryMetrics() { return summaryMetrics; }
     public void setSummaryMetrics(Map<String, Object> summaryMetrics) { this.summaryMetrics = summaryMetrics; }

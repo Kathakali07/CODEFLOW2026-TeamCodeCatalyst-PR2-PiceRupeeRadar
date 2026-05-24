@@ -47,24 +47,59 @@ def process_statement(doc_id: str):
     total_recurring_expense = 0.0
     anomalies_count = 0
     category_totals = {}
+    
+    from collections import Counter
+    import re
+    
+    # PASS 1: Pre-computation for Multivariate ML Features
+    date_counts = Counter()
+    category_amounts = {}
+    
+    for txn in transactions:
+        text = txn.get("rawNarration", "")
+        amount = float(txn.get("amount", 0.0))
+        date = txn.get("date", "")
+        
+        # Categorize early so we can compute category deviation
+        cat_result = ml_engine.categorize_transaction(text)
+        txn["predictedCategory"] = cat_result["predictedCategory"]
+        txn["confidenceScore"] = cat_result["confidenceScore"]
+        
+        date_counts[date] += 1
+        if txn["predictedCategory"] not in category_amounts:
+            category_amounts[txn["predictedCategory"]] = []
+        category_amounts[txn["predictedCategory"]].append(amount)
+        
+    category_means = {cat: sum(amts)/len(amts) for cat, amts in category_amounts.items()}
 
+    # PASS 2: Feature Extraction and Inference
     for txn in transactions:
         text = txn.get("rawNarration", "")
         amount = float(txn.get("amount", 0.0))
         txn_type = txn.get("type", "DEBIT")
+        date = txn.get("date", "")
+        predicted_category = txn["predictedCategory"]
+        confidence_score = txn["confidenceScore"]
         
-        # ML Inference
-        cat_result = ml_engine.categorize_transaction(text)
-        predicted_category = cat_result["predictedCategory"]
-        is_anomaly = ml_engine.detect_anomaly(amount)
+        # Extract multivariate features
+        velocity_score = float(date_counts[date])
+        deviation_score = abs(amount - category_means[predicted_category])
+        
+        # ML Inference using dynamic kwargs
+        is_anomaly = ml_engine.detect_anomaly(
+            amount, 
+            velocity_score=velocity_score, 
+            deviation_score=deviation_score
+        )
         
         # Simple heuristic for recurring payments (EMI, Subscriptions, SIPs, Premiums)
-        recurring_keywords = ["MONTHLY", "SIP", "PREMIUM", "EMI", "SUBSCRIPTION", "NACH", "SI/"]
-        is_recurring = predicted_category in ["EMI", "Subscription"] or any(kw in text.upper() for kw in recurring_keywords)
+        recurring_keywords = [r"\bMONTHLY\b", r"\bSIP\b", r"\bPREMIUM\b", r"\bEMI\b", r"\bSUBSCRIPTION\b", r"\bNACH\b", r"\bSI/"]
+        model_is_recurring = predicted_category in ["EMI", "Subscription"] and confidence_score > 0.97
+        is_recurring = model_is_recurring or any(re.search(kw, text.upper()) for kw in recurring_keywords)
         
         txn["mlData"] = {
             "predictedCategory": predicted_category,
-            "confidenceScore": cat_result["confidenceScore"],
+            "confidenceScore": confidence_score,
             "isAnomaly": is_anomaly,
             "isRecurring": is_recurring
         }

@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
-import Dashboard from './components/Dashboard'; // Make sure this path matches where you saved Dashboard.jsx
+import Dashboard from './components/Dashboard';
 
 export default function App() {
-  // State to track whether the user is logged in
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [tokenData, setTokenData] = useState(() => {
+    const saved = localStorage.getItem('pr2_tokenData');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
 
-  // Triggered when "Open Dashboard" or "Initialize Dashboard" is clicked
-  const handleLogin = () => {
-    console.log("Login clicked! Transitioning to Dashboard.");
-    setIsLoggedIn(true);
+  const handleLogin = (data) => {
+    console.log("Login successful!", data);
+    setTokenData(data); // { token, user: { id, name } }
+    localStorage.setItem('pr2_tokenData', JSON.stringify(data));
   };
 
-  // Triggered when the "Logout" button inside the Dashboard is clicked
   const handleLogout = () => {
-    console.log("Logout clicked! Returning to Home Page.");
-    setIsLoggedIn(false);
+    console.log("Logout clicked!");
+    setTokenData(null);
+    localStorage.removeItem('pr2_tokenData');
   };
 
   return (
     <>
-      {isLoggedIn ? (
-        <Dashboard onLogout={handleLogout} />
+      {tokenData ? (
+        <Dashboard onLogout={handleLogout} tokenData={tokenData} />
       ) : (
         <HomePage onLogin={handleLogin} />
       )}

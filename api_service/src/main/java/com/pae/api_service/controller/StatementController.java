@@ -19,7 +19,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/statements")
-@CrossOrigin(origins = "*") // Allow frontend to call these endpoints
 public class StatementController {
 
     @Autowired
@@ -39,8 +38,16 @@ public class StatementController {
 
     // 1. Upload Document (Asynchronous Processing)
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, String>> uploadStatement(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<Map<String, String>> uploadStatement(
+            @RequestParam("file") MultipartFile file, 
+            @RequestParam(value = "statementMonth", required = false) String statementMonth,
+            jakarta.servlet.http.HttpServletRequest request) {
         try {
+            String userId = (String) request.getAttribute("userId");
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
             // Read bytes immediately while the request stream is still open
             final byte[] fileBytes = file.getBytes();
             final String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
@@ -50,8 +57,9 @@ public class StatementController {
             String docId = "doc_" + UUID.randomUUID().toString();
             StatementDocument document = new StatementDocument();
             document.setId(docId);
-            document.setUserId("user_" + UUID.randomUUID().toString().substring(0, 8)); // Mock User ID
+            document.setUserId(userId); // Dynamic User ID from JWT
             document.setStatus("EXTRACTING_PDF"); // Initial state for Async pipeline
+            document.setStatementMonth(statementMonth != null ? statementMonth : "Unknown");
             
             // 2. Save Initial Document to Firestore
             firestoreService.saveStatement(document);
@@ -148,6 +156,22 @@ public class StatementController {
             }
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // 4. Get all statements for the logged-in user
+    @GetMapping("/my-statements")
+    public ResponseEntity<List<StatementDocument>> getMyStatements(jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            String userId = (String) request.getAttribute("userId");
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            List<StatementDocument> docs = firestoreService.getStatementsByUserId(userId);
+            return ResponseEntity.ok(docs);
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }

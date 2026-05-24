@@ -5,20 +5,29 @@ import { Home, Activity, Cpu } from 'lucide-react-native';
 import WelcomeScreen from './screens/WelcomeScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ArchitectureScreen from './screens/ArchitectureScreen';
+import AuthModal from './screens/AuthModal';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('welcome');
+  const [tokenData, setTokenData] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+
+  const handleLoginSuccess = (data) => {
+    setTokenData(data);
+    setShowAuth(false);
+    setActiveTab('dashboard');
+  };
 
   const renderScreen = () => {
     switch (activeTab) {
       case 'welcome':
-        return <WelcomeScreen onStart={() => setActiveTab('dashboard')} />;
+        return <WelcomeScreen onStart={() => setShowAuth(true)} />;
       case 'dashboard':
-        return <DashboardScreen />;
+        return <DashboardScreen tokenData={tokenData} />;
       case 'architecture':
         return <ArchitectureScreen />;
       default:
-        return <WelcomeScreen onStart={() => setActiveTab('dashboard')} />;
+        return <WelcomeScreen onStart={() => setShowAuth(true)} />;
     }
   };
 
@@ -29,6 +38,12 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style={statusBarStyle} />
       
+      <AuthModal 
+        visible={showAuth} 
+        onClose={() => setShowAuth(false)} 
+        onSuccess={handleLoginSuccess} 
+      />
+
       {/* Active Screen Render */}
       <View style={styles.screenWrapper}>
         {renderScreen()}

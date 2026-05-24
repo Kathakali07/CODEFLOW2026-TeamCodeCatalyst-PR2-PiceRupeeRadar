@@ -14,7 +14,6 @@ export default function TransactionTable({
   // The FIXED filtering logic
   const filteredTransactions = transactionHistory.filter(tx => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Savings') return tx.type.toLowerCase() === 'savings';
     if (activeTab === 'Credit') return tx.isCredit === true;
     if (activeTab === 'Debit') {
       if (tx.isCredit) return false; // Hide credits
@@ -48,7 +47,7 @@ export default function TransactionTable({
       <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-          {['All', 'Credit', 'Debit', 'Savings'].map(tab => (
+          {['All', 'Credit', 'Debit'].map(tab => (
             <span 
               key={tab} 
               onClick={() => {
@@ -78,19 +77,25 @@ export default function TransactionTable({
         <button onClick={handleExportCSV} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Export CSV</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 2fr 1fr 1fr 1fr 0.5fr', padding: '16px 24px', background: '#f8fafc', fontSize: 12, fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.5fr)', padding: '16px 24px', background: '#f8fafc', fontSize: 12, fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>
         <div>Ref ID</div><div>Date</div><div>Customer</div><div>Amount</div><div>Status</div><div>Type</div><div style={{ textAlign: 'right' }}>Actions</div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {filteredTransactions.length > 0 ? filteredTransactions.map((tx, i) => (
-          <div key={tx.ref} style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 2fr 1fr 1fr 1fr 0.5fr', padding: '20px 24px', alignItems: 'center', borderBottom: i !== filteredTransactions.length - 1 ? '1px solid #e2e8f0' : 'none', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-            <div>{tx.ref}</div>
-            <div style={{ color: '#64748b', fontWeight: 500 }}>{tx.date}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 24, height: 24, borderRadius: '50%', background: tx.isCredit ? '#4f46e5' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{tx.customer.charAt(0)}</div>{tx.customer}</div>
+          <div key={tx.ref} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.5fr)', padding: '20px 24px', alignItems: 'center', borderBottom: i !== filteredTransactions.length - 1 ? '1px solid #e2e8f0' : 'none', fontSize: 13, fontWeight: 600, color: '#0f172a', backgroundColor: tx.isAnomaly ? '#fef2f2' : 'transparent' }}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.ref}>{tx.ref}</div>
+            <div style={{ color: '#64748b', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.date}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+              <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: '50%', background: tx.isAnomaly ? '#ef4444' : (tx.isCredit ? '#4f46e5' : '#f59e0b'), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{tx.customer.charAt(0)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', minWidth: 0 }} title={tx.customer}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.customer}</span>
+                {tx.isAnomaly && <span style={{ color: '#ef4444', padding: '2px 6px', background: '#fee2e2', borderRadius: 4, fontSize: 10, fontWeight: 800, flexShrink: 0 }}>⚠️ ANOMALY</span>}
+              </div>
+            </div>
             <div style={{ color: tx.isCredit ? '#059669' : '#0f172a' }}>{tx.isCredit ? '+' : '-'}{formatCurrency(tx.amount)}</div>
             <div><span style={{ color: tx.status === 'Completed' ? '#059669' : '#d97706' }}>{tx.status}</span></div>
-            <div style={{ color: '#64748b', fontWeight: 500 }}>{tx.type}</div>
+            <div style={{ color: '#64748b', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.type}</div>
             <div style={{ textAlign: 'right', color: '#94a3b8', cursor: 'pointer' }}><MoreVertical size={16} style={{ display: 'inline' }} /></div>
           </div>
         )) : (

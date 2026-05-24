@@ -28,6 +28,7 @@ public class FirestoreService {
         docData.put("id", document.getId());
         docData.put("userId", document.getUserId());
         docData.put("status", document.getStatus());
+        docData.put("statementMonth", document.getStatementMonth());
         
         java.util.List<java.util.Map<String, Object>> txnList = new java.util.ArrayList<>();
         if (document.getTransactions() != null) {
@@ -52,5 +53,17 @@ public class FirestoreService {
             return documentSnapshot.toObject(StatementDocument.class);
         }
         return null;
+    }
+
+    public java.util.List<StatementDocument> getStatementsByUserId(String userId) throws ExecutionException, InterruptedException {
+        java.util.List<com.google.cloud.firestore.QueryDocumentSnapshot> docs = firestore.collection(COLLECTION_NAME)
+                .whereEqualTo("userId", userId)
+                .get().get().getDocuments();
+                
+        java.util.List<StatementDocument> statements = new java.util.ArrayList<>();
+        for (com.google.cloud.firestore.QueryDocumentSnapshot doc : docs) {
+            statements.add(doc.toObject(StatementDocument.class));
+        }
+        return statements;
     }
 }

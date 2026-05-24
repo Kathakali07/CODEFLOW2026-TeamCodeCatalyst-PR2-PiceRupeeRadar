@@ -59,6 +59,9 @@ public class LlmSummaryService {
             JsonNode root = objectMapper.readTree(responseJson);
             return root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText().trim();
 
+        } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+            System.err.println("Gemini API Rate Limit Exceeded (429). Please wait or check your quota.");
+            return "AI Advisor is currently unavailable due to API rate limits. Please try again later.";
         } catch (Exception e) {
             e.printStackTrace();
             return "AI Advisor is currently analyzing your data. Please check back later.";

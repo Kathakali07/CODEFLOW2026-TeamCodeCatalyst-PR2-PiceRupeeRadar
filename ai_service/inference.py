@@ -68,31 +68,43 @@ class MLEngine:
             "confidenceScore": float(confidence)
         }
 
-    def detect_anomaly(self, amount: float, velocity_score: float = 0.0, deviation_score: float = 0.0) -> bool:
+    def detect_anomaly(self, amount: float, **kwargs) -> bool:
         if self.is_dummy:
             return random.random() > 0.95 # 5% chance of anomaly
             
         # Real inference
-        # Ensure we pass the exact number of features the scaler expects (since you expanded it on Kaggle)
         expected_features = self.scaler.n_features_in_
-        features = np.zeros((1, expected_features))
         
+        # Initialize with the mean of the training data so missing features don't cause huge reconstruction errors
+        if hasattr(self.scaler, 'mean_') and self.scaler.mean_ is not None:
+            features = np.expand_dims(self.scaler.mean_, axis=0).copy()
+        else:
+            features = np.zeros((1, expected_features))
+            
         # We assign amount to the first feature. 
-        # (In a full production app, you would extract all 18 features from the 'txn' dictionary in consumer.py)
         features[0, 0] = amount 
         
-        # If there are exactly 3 features (old TDD), try to assign the others
-        if expected_features == 3:
-            features[0, 1] = deviation_score
-            features[0, 2] = velocity_score
-            
+        # Dynamic Feature Mapping
+        mapping = {
+            'velocity_score': 1,
+            'deviation_score': 2,
+            'time_of_day_risk': 3,
+            'geographical_distance': 4
+        }
+        
+        for kw, val in kwargs.items():
+            if kw in mapping and mapping[kw] < expected_features:
+                features[0, mapping[kw]] = float(val)
+                
         scaled_features = self.scaler.transform(features)
         reconstructed = self.autoencoder_model.predict(scaled_features, verbose=0)
         
         mse = np.mean(np.power(scaled_features - reconstructed, 2), axis=1)[0]
         
         # Threshold logic - adjust based on your training loss
-        threshold = 2.0 
+        # Increased to 50.0 to prevent false positives on typical salary amounts (e.g. 5000)
+        # while still easily catching extreme outliers like 420,000 (MSE > 300k)
+        threshold = 50.0 
         return bool(mse > threshold)
 
 ml_engine = MLEngine()

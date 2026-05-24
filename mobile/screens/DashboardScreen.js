@@ -33,34 +33,14 @@ import FinHealthTab from './components/FinHealthTab';
 
 const { width } = Dimensions.get('window');
 
-// Mock Database for statement switching
-const mockDB = {
-  'August 2024': [
-    { ref: 'AUG-001', date: 'Aug 28, 2024, 02:15pm', customer: 'Microsoft Azure', amount: 110000, status: 'Completed', type: 'Software', isCredit: false },
-    { ref: 'AUG-002', date: 'Aug 21, 2024, 11:00am', customer: 'Stripe Payouts', amount: 520000, status: 'Completed', type: 'Income', isCredit: true },
-    { ref: 'AUG-003', date: 'Aug 14, 2024, 09:30am', customer: 'WeWork India', amount: 185000, status: 'Completed', type: 'Rent', isCredit: false },
-  ],
-  'July 2024': [
-    { ref: 'JUL-001', date: 'Jul 29, 2024, 04:12pm', customer: 'Razorpay Nodal', amount: 480000, status: 'Completed', type: 'Income', isCredit: true },
-    { ref: 'JUL-002', date: 'Jul 15, 2024, 10:00am', customer: 'Facebook Ads', amount: 75000, status: 'Completed', type: 'Advertising', isCredit: false },
-    { ref: 'JUL-003', date: 'Jul 04, 2024, 01:20pm', customer: 'HDFC Savings', amount: 45000, status: 'Completed', type: 'Savings', isCredit: true },
-  ]
-};
-
-const defaultHistory = [
-  { ref: '456789356', date: 'Sep 8, 2024, 03:13pm', customer: 'Amazon AWS', amount: 150000, status: 'Completed', type: 'Software', isCredit: false },
-  { ref: '456789357', date: 'Sep 7, 2024, 1:00pm', customer: 'RR Enterprise', amount: 31456, status: 'Completed', type: 'Expenses', isCredit: false },
-  { ref: '456789358', date: 'Sep 6, 2024, 04:30pm', customer: 'TechCorp Solutions', amount: 250000, status: 'Completed', type: 'Income', isCredit: true },
-  { ref: '456789359', date: 'Sep 5, 2024, 10:15am', customer: 'ICICI Savings', amount: 25000, status: 'Completed', type: 'Savings', isCredit: true },
-  { ref: '456789360', date: 'Sep 3, 2024, 10:15am', customer: 'Agrico Private Limit...', amount: 168600, status: 'Partial', type: 'Expense', isCredit: false },
-];
+const API_BASE_URL = 'http://10.0.2.2:8081';
 
 const MOCK_FILES = [
   { name: 'september_statement_2024.csv', size: '2.8 MB', type: 'CSV' },
   { name: 'sbi_transactions_q3.pdf', size: '4.5 MB', type: 'PDF' },
 ];
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ tokenData }) {
   const [activeView, setActiveView] = useState('Overview'); // Overview, Subscriptions, FinHealth
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -72,98 +52,169 @@ export default function DashboardScreen() {
   const [activeTab, setActiveTab] = useState('All'); // All, Credit, Debit, Savings
   const [debitCategory, setDebitCategory] = useState('All');
 
-  const [transactionHistory, setTransactionHistory] = useState(defaultHistory);
-  const [pastStatements, setPastStatements] = useState([
-    { month: 'August 2024', txCount: 142, status: 'Analysed' },
-    { month: 'July 2024', txCount: 128, status: 'Analysed' },
-  ]);
+  // Mappers
+  const mapTransactions = (backendTxns = []) => {
+    return backendTxns.map(tx => ({
+      ref: tx.txnId || Math.random().toString(36).substring(7),
+      date: tx.date || 'Unknown Date',
+      customer: tx.rawNarration || 'Unknown',
+      amount: tx.amount || 0,
+      status: 'Completed',
+      type: tx.type || 'Other',
+      isCredit: ['Income', 'Savings', 'Refund', 'Credit'].includes(tx.type)
+    }));
+  };
 
-  // Polling stages for AI simulation
+  const COLORS = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#f97316', '#8b5cf6'];
+  const mapChartData = (breakdown = {}, totalExp = 1) => {
+    let index = 0;
+    return Object.entries(breakdown).map(([label, amt]) => ({
+      label,
+      pct: Math.round((amt / (totalExp || 1)) * 100),
+      color: COLORS[index++ % COLORS.length]
+    })).sort((a, b) => b.pct - a.pct);
+  };
+
+  const mapSubscriptions = (recurring = []) => {
+    return recurring.map((tx, i) => ({
+      id: i.toString(),
+      name: tx.rawNarration,
+      category: tx.type,
+      amount: tx.amount,
+      nextDue: 'Next Month',
+      status: 'Active',
+      icon: '🔄'
+    }));
+  };
+
+  const [transactionHistory, setTransactionHistory] = useState([]);
+  const [pastStatements, setPastStatements] = useState([]);
+  const [activeDocId, setActiveDocId] = useState(null);
+  
+  const [summaryMetrics, setSummaryMetrics] = useState({
+    totalIncome: 0, totalExpense: 0, financialHealth: 'CALCULATING', categoryBreakdown: {}
+  });
+  const [subscriptionsList, setSubscriptionsList] = useState([]);
+  const [aiSummaryText, setAiSummaryText] = useState('');
+
+  // Hydrate on startup
+  useEffect(() => {
+    const fetchMyStatements = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/statements/my-statements`, {
+          headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+        });
+        if (res.ok) {
+          const docs = await res.json();
+          if (docs.length > 0) {
+            const latestDoc = docs[docs.length - 1];
+            if (latestDoc.status === 'COMPLETED') {
+               await loadCompletedDocument(latestDoc.id);
+            } else if (latestDoc.status === 'EXTRACTING_PDF' || latestDoc.status === 'PROCESSING') {
+               setActiveDocId(latestDoc.id);
+               setIsAnalyzing(true);
+            }
+            setPastStatements(docs.map(d => ({
+               id: d.id, month: d.id.substring(0,8), txCount: d.transactions?.length || 0, status: d.status
+            })));
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    if (tokenData?.token) fetchMyStatements();
+  }, [tokenData]);
+
+  const loadCompletedDocument = async (docId) => {
+    try {
+      const docRes = await fetch(`${API_BASE_URL}/api/statements/${docId}`, {
+        headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+      });
+      const docData = await docRes.json();
+      
+      const statRes = await fetch(`${API_BASE_URL}/api/statements/status/${docId}`, {
+        headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+      });
+      const statData = await statRes.json();
+
+      setTransactionHistory(mapTransactions(docData.transactions || []));
+      setSubscriptionsList(mapSubscriptions(docData.recurringTransactions || []));
+      
+      if (statData.summaryMetrics) setSummaryMetrics(statData.summaryMetrics);
+      if (statData.aiSummary) setAiSummaryText(statData.aiSummary);
+
+      setActiveMonth(docId.substring(0,8));
+      setShowResults(true);
+      setIsAnalyzing(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Real Polling Logic
   useEffect(() => {
     let pollInterval;
-    if (isAnalyzing) {
-      let pollAttempt = 0;
-      const stages = [
-        'Initializing AI engine...',
-        'Detecting recurring patterns...',
-        'Calculating FinHealth score...',
-        'Generating insights...',
-      ];
-      setPollMessage(stages[0]);
-
-      pollInterval = setInterval(() => {
-        pollAttempt++;
-        if (pollAttempt < stages.length) {
-          setPollMessage(stages[pollAttempt]);
-        } else {
-          clearInterval(pollInterval);
-          const newStatement = { month: 'September 2024', txCount: 312, status: 'Analysed' };
-          const newTx = {
-            ref: '998877665',
-            date: 'Sep 24, 2024, 09:45am',
-            customer: 'Google Cloud Ads',
-            amount: 85000,
-            status: 'Completed',
-            type: 'Advertising',
-            isCredit: false,
-          };
-
-          setPastStatements((prev) => [newStatement, ...prev]);
-          setTransactionHistory([newTx, ...defaultHistory]);
-          setActiveMonth('September 2024');
-          setIsAnalyzing(false);
-          setShowResults(true);
+    if (isAnalyzing && activeDocId) {
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/statements/status/${activeDocId}`, {
+             headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+          });
+          const data = await res.json();
+          if (data.status === 'EXTRACTING_PDF') {
+             setPollMessage('Extracting PDF & Anonymizing PII...');
+          } else if (data.status === 'PROCESSING') {
+             setPollMessage('AI Categorization & Anomaly Detection running...');
+          } else if (data.status === 'COMPLETED') {
+             clearInterval(pollInterval);
+             await loadCompletedDocument(activeDocId);
+          } else if (data.status === 'FAILED') {
+             clearInterval(pollInterval);
+             setIsAnalyzing(false);
+             Alert.alert('Error', 'Processing failed!');
+          }
+        } catch (e) {
+          console.error(e);
         }
-      }, 600);
+      }, 3000); 
     }
     return () => clearInterval(pollInterval);
-  }, [isAnalyzing]);
+  }, [isAnalyzing, activeDocId]); 
 
   // Dynamic calculations
-  const startingBalance = 2900000;
-  const totalCredit = transactionHistory
+  const startingBalance = 0;
+  const totalCredit = summaryMetrics.totalIncome || transactionHistory
     .filter((tx) => tx.isCredit)
     .reduce((sum, tx) => sum + tx.amount, 0);
-  const totalExpense = transactionHistory
+  const totalExpense = summaryMetrics.totalExpense || transactionHistory
     .filter((tx) => !tx.isCredit)
     .reduce((sum, tx) => sum + tx.amount, 0);
   const currentBalance = startingBalance + totalCredit - totalExpense;
 
   const formatCurrency = (num) => '₹' + num.toLocaleString('en-IN');
 
-  const chartData = [
-    { label: 'Software', pct: 40, color: '#4f46e5' },
-    { label: 'Rent', pct: 30, color: '#0ea5e9' },
-    { label: 'Advertising', pct: 15, color: '#f59e0b' },
-    { label: 'Utilities', pct: 15, color: '#10b981' },
-  ];
+  const chartData = mapChartData(summaryMetrics.categoryBreakdown, totalExpense);
 
   const handleSelectFile = (file) => {
     setSelectedFile(file);
   };
 
   const handleProcessFile = () => {
-    if (!selectedFile) return;
-    setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
-      setIsAnalyzing(true);
-    }, 500);
+    // Native document upload not fully supported here without expo-document-picker
+    // Leaving mock behavior or simply alert user for mobile version
+    Alert.alert("Upload not supported in mock client. Please use Web client to upload statements.");
+    setSelectedFile(null);
   };
 
-  const loadPastStatement = (month) => {
-    if (mockDB[month]) {
-      setTransactionHistory(mockDB[month]);
-      setActiveMonth(month);
-      setShowResults(true);
-      setActiveTab('All');
-    }
+  const loadPastStatement = (id) => {
+    loadCompletedDocument(id);
   };
 
   const resetUploader = () => {
     setShowResults(false);
     setSelectedFile(null);
-    setTransactionHistory(defaultHistory);
+    setTransactionHistory([]);
     setActiveMonth('Current');
     setActiveTab('All');
   };
@@ -515,13 +566,20 @@ export default function DashboardScreen() {
 
       {activeView === 'Subscriptions' && (
         <View style={styles.subTabWrapper}>
-          <SubscriptionsTab formatCurrency={formatCurrency} />
+          <SubscriptionsTab 
+            formatCurrency={formatCurrency} 
+            subscriptionsList={subscriptionsList}
+            totalRecurringExpense={summaryMetrics.totalRecurringExpense || 0}
+          />
         </View>
       )}
 
       {activeView === 'FinHealth' && (
         <View style={styles.subTabWrapper}>
-          <FinHealthTab />
+          <FinHealthTab 
+            summaryMetrics={summaryMetrics} 
+            aiSummaryText={aiSummaryText} 
+          />
         </View>
       )}
 

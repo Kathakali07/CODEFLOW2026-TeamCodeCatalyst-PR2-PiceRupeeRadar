@@ -222,7 +222,11 @@ function ProductMockup() {
 }
 
 /* ─── Main Page ─── */
+import AuthModal from './AuthModal';
+
 export default function HomePage({ onLogin }) {
+  const [showAuth, setShowAuth] = React.useState(false);
+
   const architectureDetails = [
     {
       icon: <Server size={22} color="#7850f0" />,
@@ -259,6 +263,15 @@ export default function HomePage({ onLogin }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'DM Sans', sans-serif", color: '#111', overflowX: 'hidden' }}>
+      {showAuth && (
+        <AuthModal 
+          onClose={() => setShowAuth(false)} 
+          onSuccess={(data) => {
+            setShowAuth(false);
+            onLogin(data); // Pass token data up to App.jsx
+          }} 
+        />
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;0,9..40,900&display=swap');
         * { box-sizing: border-box; }
@@ -282,7 +295,7 @@ export default function HomePage({ onLogin }) {
         .btn-secondary:active { transform: scale(0.97); }
       `}</style>
 
-      <Navbar onLogin={onLogin} />
+      <Navbar onLogin={() => setShowAuth(true)} />
 
       {/* ── HERO ── */}
       <section style={{ position: 'relative', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 24px 80px', overflow: 'hidden' }}>
@@ -304,7 +317,7 @@ export default function HomePage({ onLogin }) {
           <div className="fade-up-4" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               className="btn-primary"
-              onClick={onLogin}
+              onClick={() => setShowAuth(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', background: '#7850f0', color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 32px rgba(120,80,240,0.4)' }}
             >
               Open Dashboard <ArrowRight size={16} />

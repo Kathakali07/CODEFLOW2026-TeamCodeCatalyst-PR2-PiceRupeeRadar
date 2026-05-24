@@ -8,7 +8,7 @@ import sys
 # pdf.add_page()
 # ... skipping dummy generation ...
 
-pdf_filename = "Bandhan.pdf"
+pdf_filename = "dummy_statement.pdf"
 print(f"[*] Using real PDF: {pdf_filename}")
 
 # 2. Upload to Spring Boot API

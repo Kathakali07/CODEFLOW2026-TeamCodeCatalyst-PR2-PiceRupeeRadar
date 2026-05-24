@@ -2,14 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, Platform } from 'react-native';
 import { Repeat, Calendar } from 'lucide-react-native';
 
-const mockSubscriptions = [
-  { id: 1, name: 'HDFC Home Loan EMI', category: 'EMI', amount: 45000, nextDue: 'Oct 5, 2024', status: 'Active', icon: '🏦' },
-  { id: 2, name: 'AWS Cloud Hosting', category: 'Software', amount: 150000, nextDue: 'Oct 8, 2024', status: 'Active', icon: '☁️' },
-  { id: 3, name: 'Google Workspace', category: 'Software', amount: 12500, nextDue: 'Oct 12, 2024', status: 'Active', icon: '📧' },
-  { id: 4, name: 'WeWork Office Rent', category: 'Rent', amount: 185000, nextDue: 'Oct 15, 2024', status: 'Active', icon: '🏢' },
-];
-
-export default function SubscriptionsTab({ formatCurrency }) {
+export default function SubscriptionsTab({ formatCurrency, subscriptionsList = [], totalRecurringExpense = 0 }) {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
@@ -25,11 +18,11 @@ export default function SubscriptionsTab({ formatCurrency }) {
 
         <View style={styles.totalBlock}>
           <Text style={styles.totalLabel}>TOTAL MONTHLY RECURRING</Text>
-          <Text style={styles.totalAmount}>{formatCurrency(392500)}</Text>
+          <Text style={styles.totalAmount}>{formatCurrency(totalRecurringExpense)}</Text>
         </View>
 
         <View style={styles.list}>
-          {mockSubscriptions.map((sub) => (
+          {subscriptionsList.length > 0 ? subscriptionsList.map((sub) => (
             <View key={sub.id} style={styles.subItem}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{sub.icon}</Text>
@@ -48,7 +41,9 @@ export default function SubscriptionsTab({ formatCurrency }) {
                 </View>
               </View>
             </View>
-          ))}
+          )) : (
+            <Text style={{ textAlign: 'center', color: '#64748b', marginVertical: 20 }}>No recurring payments detected yet.</Text>
+          )}
         </View>
       </View>
     </View>

@@ -1,25 +1,42 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Line, Path, Circle, Text as SvgText } from 'react-native-svg';
-import { Activity, CheckCircle, AlertCircle } from 'lucide-react-native';
+import { Activity, CheckCircle, AlertCircle, BrainCircuit } from 'lucide-react-native';
 
-export default function FinHealthTab() {
+export default function FinHealthTab({ summaryMetrics = {}, aiSummaryText = '' }) {
+  const isHealthy = summaryMetrics.financialHealth === 'HEALTHY';
+  const isWarning = summaryMetrics.financialHealth === 'WARNING';
+  
+  const iconColor = isHealthy ? '#059669' : (isWarning ? '#d97706' : '#dc2626');
+  const bgColor = isHealthy ? '#d1fae5' : (isWarning ? '#fef3c7' : '#fee2e2');
+  const score = isHealthy ? '82' : (isWarning ? '55' : '30');
+
   return (
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <View style={styles.iconWrapper}>
-            <Activity size={22} color="#059669" />
+          <View style={[styles.iconWrapper, { backgroundColor: bgColor }]}>
+            <Activity size={22} color={iconColor} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.title}>AI Financial Health Score</Text>
             <Text style={styles.subtitle}>Based on liquidity, debt-ratio, and savings</Text>
           </View>
           <View style={styles.scoreBlock}>
-            <Text style={styles.scoreNumber}>82</Text>
+            <Text style={[styles.scoreNumber, { color: iconColor }]}>{score}</Text>
             <Text style={styles.scoreMax}>/100</Text>
           </View>
         </View>
+
+        {aiSummaryText ? (
+          <View style={styles.aiSummaryCard}>
+            <View style={styles.aiSummaryHeader}>
+              <BrainCircuit size={16} color="#4f46e5" />
+              <Text style={styles.aiSummaryTitle}>Gemini AI Advisor Insight</Text>
+            </View>
+            <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
+          </View>
+        ) : null}
 
         {/* SVG Trend Chart */}
         <View style={styles.chartContainer}>
@@ -130,6 +147,30 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontWeight: '700',
     marginLeft: 1,
+  },
+  aiSummaryCard: {
+    backgroundColor: '#e0e7ff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderColor: '#c7d2fe',
+    borderWidth: 1,
+  },
+  aiSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  aiSummaryTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#4f46e5',
+  },
+  aiSummaryText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#1e1b4b',
   },
   chartContainer: {
     backgroundColor: '#f8fafc',
