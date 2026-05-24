@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 
-const API_BASE_URL = 'http://10.0.2.2:8081'; // Android Emulator default alias to localhost
+const API_BASE_URL = 'http://192.168.1.47:8081'; // Local development server IP
 
 export default function AuthModal({ visible, onClose, onSuccess }) {
   const [isLogin, setIsLogin] = useState(true);

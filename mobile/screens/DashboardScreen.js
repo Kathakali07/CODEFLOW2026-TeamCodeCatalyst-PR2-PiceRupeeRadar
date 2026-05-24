@@ -33,7 +33,7 @@ import FinHealthTab from './components/FinHealthTab';
 
 const { width } = Dimensions.get('window');
 
-const API_BASE_URL = 'http://10.0.2.2:8081';
+const API_BASE_URL = 'http://192.168.1.47:8081';
 
 const MOCK_FILES = [
   { name: 'september_statement_2024.csv', size: '2.8 MB', type: 'CSV' },
