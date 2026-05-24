@@ -33,6 +33,37 @@ def setup_pubsub():
     except AlreadyExists:
         pass
 
+import requests
+import json
+import re
+from collections import defaultdict
+from dotenv import load_dotenv
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "dummy_key")
+
+def calculate_sketchiness(merchant_string):
+    merchant_string = str(merchant_string)
+    if len(merchant_string) == 0: return 0.0
+    non_alpha_count = sum(1 for char in merchant_string if not char.isalpha())
+    return round(non_alpha_count / len(merchant_string), 2)
+
+def extract_merchant(text):
+    text = text.strip()
+    if text.startswith("UPI/"):
+        parts = text.split("/")
+        if len(parts) > 3:
+            return parts[3][:15].strip()
+        elif len(parts) > 1:
+            return parts[-1][:15].strip()
+    elif "NEFT" in text or "IMPS" in text:
+        parts = text.split("-")
+        if len(parts) > 2:
+            return parts[2][:15].strip()
+    elif "/" in text:
+        return text.split("/")[0][:15].strip()
+    return text[:15].strip()
+
 def process_statement(doc_id: str):
     print(f"Processing Document ID: {doc_id}")
     doc = db_helper.get_document(doc_id)
@@ -48,61 +79,121 @@ def process_statement(doc_id: str):
     anomalies_count = 0
     category_totals = {}
     
-    from collections import Counter
-    import re
-    
-    # PASS 1: Pre-computation for Multivariate ML Features
-    date_counts = Counter()
-    category_amounts = {}
+    # 1. Pre-computation for velocities and routine analysis
+    merchant_dates = defaultdict(list)
+    merchant_amounts = defaultdict(list)
+    date_amounts = defaultdict(list)
     
     for txn in transactions:
         text = txn.get("rawNarration", "")
+        merchant_name = extract_merchant(text)
+        date_str = txn.get("date", "")
         amount = float(txn.get("amount", 0.0))
-        date = txn.get("date", "")
         
-        # Categorize early so we can compute category deviation
-        cat_result = ml_engine.categorize_transaction(text)
-        txn["predictedCategory"] = cat_result["predictedCategory"]
-        txn["confidenceScore"] = cat_result["confidenceScore"]
-        
-        date_counts[date] += 1
-        if txn["predictedCategory"] not in category_amounts:
-            category_amounts[txn["predictedCategory"]] = []
-        category_amounts[txn["predictedCategory"]].append(amount)
-        
-    category_means = {cat: sum(amts)/len(amts) for cat, amts in category_amounts.items()}
+        merchant_dates[merchant_name].append(date_str)
+        merchant_amounts[merchant_name].append(amount)
+        if amount > 1000 and amount % 1000 == 0:
+            date_amounts[date_str].append(amount)
 
-    # PASS 2: Feature Extraction and Inference
-    for txn in transactions:
+    confused_txns = []
+
+    # 2. First Pass: DistilBERT Classification & Feature Extraction
+    for i, txn in enumerate(transactions):
         text = txn.get("rawNarration", "")
+        merchant_name = extract_merchant(text)
+        date_str = txn.get("date", "")
         amount = float(txn.get("amount", 0.0))
         txn_type = txn.get("type", "DEBIT")
-        date = txn.get("date", "")
-        predicted_category = txn["predictedCategory"]
-        confidence_score = txn["confidenceScore"]
         
-        # Extract multivariate features
-        velocity_score = float(date_counts[date])
-        deviation_score = abs(amount - category_means[predicted_category])
+        # 3. Anomaly Detection
+        sketchiness = calculate_sketchiness(merchant_name)
+        velocity = len(date_amounts.get(date_str, []))
+        if txn_type == "CREDIT":
+            is_anomaly = False
+        else:
+            is_anomaly = ml_engine.detect_anomaly(amount, merchant_sketchiness_score=sketchiness, velocity_score=velocity)
         
-        # ML Inference using dynamic kwargs
-        is_anomaly = ml_engine.detect_anomaly(
-            amount, 
-            velocity_score=velocity_score, 
-            deviation_score=deviation_score
-        )
+        # Categorization
+        cat_result = ml_engine.categorize_transaction(text)
+        predicted_category = cat_result["predictedCategory"]
+        confidence = cat_result.get("confidenceScore", 1.0)
+        top2_distance = cat_result.get("top2Distance", 1.0)
+        source = "DistilBERT"
         
-        # Simple heuristic for recurring payments (EMI, Subscriptions, SIPs, Premiums)
-        recurring_keywords = [r"\bMONTHLY\b", r"\bSIP\b", r"\bPREMIUM\b", r"\bEMI\b", r"\bSUBSCRIPTION\b", r"\bNACH\b", r"\bSI/"]
-        model_is_recurring = predicted_category in ["EMI", "Subscription"] and confidence_score > 0.97
-        is_recurring = model_is_recurring or any(re.search(kw, text.upper()) for kw in recurring_keywords)
+        # Subscription vs Routine Spend Analysis
+        is_recurring = False
+        merchant_count = len(merchant_dates[merchant_name])
+        amounts_list = merchant_amounts[merchant_name]
+        txn_type = txn.get("type", "DEBIT")
         
+        if txn_type == "DEBIT":
+            if merchant_count > 3:
+                variance = max(amounts_list) - min(amounts_list)
+                avg_amount = sum(amounts_list) / merchant_count
+                if avg_amount > 0 and (variance / avg_amount) < 0.20:
+                    is_recurring = True
+                    predicted_category = "Routine Habit"
+            elif merchant_count == 1:
+                amount_ends_in_9 = str(int(amount)).endswith("9")
+                if predicted_category == "Subscription" or amount_ends_in_9:
+                    is_recurring = True
+                    predicted_category = "Subscription"
+        
+        # Queue low confidence transactions for Batch LLM (except if already tagged as Routine)
+        if (confidence < 0.60 or top2_distance < 0.1) and predicted_category != "Routine Habit":
+            confused_txns.append({'index': i, 'text': text})
+            
         txn["mlData"] = {
             "predictedCategory": predicted_category,
-            "confidenceScore": confidence_score,
+            "confidenceScore": confidence,
             "isAnomaly": is_anomaly,
-            "isRecurring": is_recurring
+            "isRecurring": is_recurring,
+            "source": source
         }
+
+    # 3. Batch LLM Fallback (Single API Call)
+    if confused_txns:
+        print(f"Batching {len(confused_txns)} confused transactions to Gemini...")
+        prompt = "Categorize the following transactions into strictly one of these categories: [Food, Shopping, Rent, Travel, Salary, UPI Transfer, Subscription, EMI, Investment, Bank Fees]. Return ONLY a valid JSON array of objects with keys 'index' and 'category'. Do not wrap in markdown or give any explanations.\n\nTransactions:\n"
+        for c in confused_txns:
+            prompt += f"Index: {c['index']} | Text: {c['text']}\n"
+            
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={GEMINI_API_KEY}"
+            headers = {'Content-Type': 'application/json'}
+            data = {"contents": [{"parts":[{"text": prompt}]}]}
+            
+            resp = requests.post(url, headers=headers, json=data)
+            resp_json = resp.json()
+            
+            if 'candidates' in resp_json:
+                llm_text = resp_json['candidates'][0]['content']['parts'][0]['text'].strip()
+                
+                # Manual regex to handle markdown in python
+                llm_text = re.sub(r"^```json\s*", "", llm_text)
+                llm_text = re.sub(r"\s*```$", "", llm_text)
+                llm_text = llm_text.strip()
+                
+                llm_results = json.loads(llm_text)
+                for res in llm_results:
+                    idx = res.get('index')
+                    cat = res.get('category')
+                    if idx is not None and cat:
+                        transactions[idx]["mlData"]["predictedCategory"] = cat
+                        transactions[idx]["mlData"]["confidenceScore"] = 0.99
+                        transactions[idx]["mlData"]["source"] = "LLM_Fallback"
+            else:
+                print(f"Gemini Batch Fallback failed to parse response: {resp_json}")
+        except Exception as e:
+            print(f"Gemini Batch Fallback exception: {e}")
+
+    # 4. Final Aggregation
+    for txn in transactions:
+        amount = float(txn.get("amount", 0.0))
+        txn_type = txn.get("type", "DEBIT")
+        predicted_category = txn["mlData"]["predictedCategory"]
+        is_recurring = txn["mlData"]["isRecurring"]
+        is_anomaly = txn["mlData"]["isAnomaly"]
         
         if txn_type == "CREDIT":
             total_income += amount
@@ -117,7 +208,6 @@ def process_statement(doc_id: str):
 
     highest_cat = max(category_totals, key=category_totals.get) if category_totals else "None"
     
-    # Calculate Financial Health Indicator
     if total_income == 0 and total_expense > 0:
         health_status = "CRITICAL"
     elif total_expense > total_income:

@@ -10,8 +10,12 @@ public class StatementDocument {
     private String statementMonth;
     private Map<String, Object> summaryMetrics;
     private List<Transaction> transactions;
+    private String aiSummary;
 
     public StatementDocument() {}
+
+    public String getAiSummary() { return aiSummary; }
+    public void setAiSummary(String aiSummary) { this.aiSummary = aiSummary; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

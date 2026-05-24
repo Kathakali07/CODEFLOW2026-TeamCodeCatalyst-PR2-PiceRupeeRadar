@@ -8,3 +8,5 @@ pandas
 numpy
 transformers
 torch
+google-generativeai
+python-dotenv

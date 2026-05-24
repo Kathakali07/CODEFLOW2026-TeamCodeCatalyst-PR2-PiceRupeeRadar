@@ -135,7 +135,24 @@ public class StatementController {
                 if (docSnapshot.exists() && docSnapshot.contains("summaryMetrics")) {
                     Map<String, Object> metrics = (Map<String, Object>) docSnapshot.get("summaryMetrics");
                     response.put("summaryMetrics", metrics);
-                    response.put("aiSummary", llmSummaryService.generateFinancialAdvice(metrics));
+                    
+                    if (docSnapshot.contains("aiSummary")) {
+                        response.put("aiSummary", docSnapshot.getString("aiSummary"));
+                    } else {
+                        String summary = llmSummaryService.generateFinancialAdvice(metrics);
+                        response.put("aiSummary", summary);
+                        
+                        // Cache it in Firestore to prevent rate limits!
+                        try {
+                            com.google.cloud.firestore.Firestore db = com.google.cloud.firestore.FirestoreOptions.getDefaultInstance().toBuilder()
+                                .setProjectId("fintech-hackathon")
+                                .setEmulatorHost("127.0.0.1:8080")
+                                .build().getService();
+                            db.collection("statements").document(id).update("aiSummary", summary).get();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
             
