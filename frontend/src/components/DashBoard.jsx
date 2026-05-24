@@ -145,11 +145,13 @@ export default function Dashboard({ onLogout, tokenData }) {
     setIsAnalyzing(false);
   };
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+
   // Hydrate on startup
   useEffect(() => {
     const fetchMyStatements = async () => {
       try {
-        const res = await fetch('http://localhost:8081/api/statements/my-statements', {
+        const res = await fetch(`${API_URL}/api/statements/my-statements`, {
           headers: { 'Authorization': `Bearer ${tokenData?.token}` }
         });
         if (res.ok) {
@@ -160,7 +162,7 @@ export default function Dashboard({ onLogout, tokenData }) {
 
             const completedDocs = docs.filter(d => d.status === 'COMPLETED');
             if (completedDocs.length > 0) {
-              fetch(`http://localhost:8081/api/statements/status/${completedDocs[completedDocs.length - 1].id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
+              fetch(`${API_URL}/api/statements/status/${completedDocs[completedDocs.length - 1].id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
                 .then(r => r.json())
                 .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
             }
@@ -195,7 +197,7 @@ export default function Dashboard({ onLogout, tokenData }) {
 
   const loadCompletedDocument = async (docId) => {
     try {
-      const res = await fetch('http://localhost:8081/api/statements/my-statements', {
+      const res = await fetch(`${API_URL}/api/statements/my-statements`, {
         headers: { 'Authorization': `Bearer ${tokenData?.token}` }
       });
       if (res.ok) {
@@ -205,7 +207,7 @@ export default function Dashboard({ onLogout, tokenData }) {
 
         const completedDocs = docs.filter(d => d.status === 'COMPLETED');
         if (completedDocs.length > 0) {
-          fetch(`http://localhost:8081/api/statements/status/${completedDocs[completedDocs.length - 1].id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
+          fetch(`${API_URL}/api/statements/status/${completedDocs[completedDocs.length - 1].id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
             .then(r => r.json())
             .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
         }
@@ -244,7 +246,7 @@ export default function Dashboard({ onLogout, tokenData }) {
     if (isAnalyzing && activeDocId) {
       pollInterval = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:8081/api/statements/status/${activeDocId}`, {
+          const res = await fetch(`${API_URL}/api/statements/status/${activeDocId}`, {
              headers: { 'Authorization': `Bearer ${tokenData?.token}` }
           });
           const data = await res.json();
@@ -294,7 +296,7 @@ export default function Dashboard({ onLogout, tokenData }) {
     if (statementMonth) formData.append('statementMonth', statementMonth);
 
     try {
-      const res = await fetch('http://localhost:8081/api/statements/upload', {
+      const res = await fetch(`${API_URL}/api/statements/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${tokenData?.token}` },
         body: formData
@@ -322,7 +324,7 @@ export default function Dashboard({ onLogout, tokenData }) {
       
       const doc = filtered[filtered.length - 1];
       if (doc && doc.status === 'COMPLETED') {
-        fetch(`http://localhost:8081/api/statements/status/${doc.id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
+        fetch(`${API_URL}/api/statements/status/${doc.id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
           .then(r => r.json())
           .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
       }

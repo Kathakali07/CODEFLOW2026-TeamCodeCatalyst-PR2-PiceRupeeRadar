@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # The Python SQS Consumer (FastAPI + Background Thread)
+  ai-service:
+    build: 
+      context: ./ai_service_aws
+      dockerfile: Dockerfile
+    container_name: ai_service_aws
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./ai_service_aws/.env
+    restart: unless-stopped
+
+  # The Java Spring Boot Backend
+  api-service:
+    build: 
+      context: ./api_service_aws
+      dockerfile: Dockerfile
+    container_name: api_service_aws
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./ai_service_aws/.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    depends_on:
+      - ai-service
+    restart: unless-stopped

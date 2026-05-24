@@ -53,9 +53,10 @@ export default function AuthModal({ onClose, onSuccess }) {
     setIsLoading(true);
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
     
     try {
-      const res = await fetch(`http://localhost:8081${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
