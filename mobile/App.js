@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Home, Activity, Cpu } from 'lucide-react-native';
@@ -7,15 +7,55 @@ import DashboardScreen from './screens/DashboardScreen';
 import ArchitectureScreen from './screens/ArchitectureScreen';
 import AuthModal from './screens/AuthModal';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('welcome');
   const [tokenData, setTokenData] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  const handleLoginSuccess = (data) => {
+  useEffect(() => {
+    const loadToken = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@pr2_auth_token');
+        if (stored) {
+          try {
+            setTokenData(JSON.parse(stored));
+            setActiveTab('dashboard');
+          } catch (parseError) {
+            console.log("Invalid token format in storage, clearing.");
+            await AsyncStorage.removeItem('@pr2_auth_token');
+          }
+        }
+      } catch (e) {
+        console.error("Error loading token", e);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    loadToken();
+  }, []);
+
+  const handleLoginSuccess = async (data) => {
+    try {
+      await AsyncStorage.setItem('@pr2_auth_token', JSON.stringify(data));
+    } catch (e) {
+      console.error("Error saving token", e);
+    }
     setTokenData(data);
     setShowAuth(false);
     setActiveTab('dashboard');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('@pr2_auth_token');
+    } catch (e) {
+      console.error(e);
+    }
+    setTokenData(null);
+    setActiveTab('welcome');
   };
 
   const renderScreen = () => {
@@ -33,6 +73,10 @@ export default function App() {
 
   // Determine status bar style based on current screen
   const statusBarStyle = activeTab === 'welcome' ? 'light' : 'dark';
+
+  if (!isReady) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

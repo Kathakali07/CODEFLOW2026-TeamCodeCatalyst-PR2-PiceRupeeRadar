@@ -1,9 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Svg, { Line, Path, Circle, Text as SvgText } from 'react-native-svg';
-import { Activity, CheckCircle, AlertCircle, BrainCircuit } from 'lucide-react-native';
+import { Activity, CheckCircle, AlertCircle, BrainCircuit, Send } from 'lucide-react-native';
+import Markdown from 'react-native-markdown-display';
 
-export default function FinHealthTab({ summaryMetrics = {}, aiSummaryText = '' }) {
+export default function FinHealthTab({ summaryMetrics = {}, aiSummaryText = '', activeDocId, chatMessage, setChatMessage, chatHistory = [], isChatLoading, handleSendChat }) {
+  const scrollViewRef = useRef();
   const isHealthy = summaryMetrics.financialHealth === 'HEALTHY';
   const isWarning = summaryMetrics.financialHealth === 'WARNING';
   
@@ -37,6 +39,53 @@ export default function FinHealthTab({ summaryMetrics = {}, aiSummaryText = '' }
             <Text style={styles.aiSummaryText}>{aiSummaryText}</Text>
           </View>
         ) : null}
+
+        {/* ── AI CHAT INTERFACE ── */}
+        <View style={styles.chatContainer}>
+          <View style={styles.chatHeader}>
+            <BrainCircuit size={18} color="#4f46e5" />
+            <Text style={styles.chatTitle}>Ask Gemini AI</Text>
+          </View>
+          
+          <ScrollView 
+            style={styles.chatHistoryScroll}
+            ref={scrollViewRef}
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          >
+            {chatHistory.map((msg, idx) => (
+              <View key={idx} style={[styles.chatBubble, msg.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAI]}>
+                {msg.role === 'assistant' || msg.role === 'model' ? (
+                  <Markdown style={markdownStyles}>{msg.content}</Markdown>
+                ) : (
+                  <Text style={styles.chatBubbleTextUser}>{msg.content}</Text>
+                )}
+              </View>
+            ))}
+            {isChatLoading && (
+              <View style={[styles.chatBubble, styles.chatBubbleAI, { width: 50, alignItems: 'center' }]}>
+                <ActivityIndicator size="small" color="#4f46e5" />
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.chatInputRow}>
+            <TextInput
+              style={styles.chatInput}
+              placeholder="Ask about your finances..."
+              placeholderTextColor="#94a3b8"
+              value={chatMessage}
+              onChangeText={setChatMessage}
+              onSubmitEditing={handleSendChat}
+            />
+            <TouchableOpacity 
+              style={[styles.chatSendBtn, !chatMessage.trim() && { opacity: 0.5 }]} 
+              onPress={handleSendChat}
+              disabled={!chatMessage.trim() || isChatLoading}
+            >
+              <Send size={16} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* SVG Trend Chart */}
         <View style={styles.chartContainer}>
@@ -221,4 +270,97 @@ const styles = StyleSheet.create({
     color: '#64748b',
     lineHeight: 16,
   },
+  chatContainer: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    minHeight: 250,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  chatTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  chatHistoryScroll: {
+    maxHeight: 300,
+    marginBottom: 12,
+  },
+  chatBubble: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+    maxWidth: '85%',
+  },
+  chatBubbleUser: {
+    backgroundColor: '#4f46e5',
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+  },
+  chatBubbleAI: {
+    backgroundColor: '#f1f5f9',
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+  },
+  chatBubbleTextUser: {
+    color: '#ffffff',
+    fontSize: 13,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 10,
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  chatSendBtn: {
+    backgroundColor: '#4f46e5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+
+const markdownStyles = {
+  body: {
+    color: '#1e293b',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  strong: {
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  bullet_list: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  heading1: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  heading2: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  heading3: { fontSize: 13, fontWeight: '800', marginBottom: 4 },
+};

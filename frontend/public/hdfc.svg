@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40">
+  <rect width="120" height="40" rx="4" fill="#ffffff" />
+  <rect x="5" y="8" width="24" height="24" fill="#004c8f" />
+  <rect x="11" y="14" width="12" height="12" fill="#ed232a" />
+  <text x="36" y="26" font-family="Arial, sans-serif" font-weight="bold" font-size="18" fill="#004c8f">HDFC Bank</text>
+</svg>

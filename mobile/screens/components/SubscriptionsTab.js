@@ -29,8 +29,15 @@ export default function SubscriptionsTab({ formatCurrency, subscriptionsList = [
               </View>
               <View style={styles.meta}>
                 <Text style={styles.name}>{sub.name}</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{sub.category}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{sub.category}</Text>
+                  </View>
+                  {sub.count > 0 && (
+                    <View style={[styles.badge, { backgroundColor: '#e0e7ff' }]}>
+                      <Text style={[styles.badgeText, { color: '#4338ca' }]}>Detected {sub.count}x</Text>
+                    </View>
+                  )}
                 </View>
               </View>
               <View style={styles.rightSide}>

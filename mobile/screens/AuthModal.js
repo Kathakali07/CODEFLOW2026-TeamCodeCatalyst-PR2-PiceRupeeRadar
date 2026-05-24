@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 
-const API_BASE_URL = 'http://192.168.1.47:8081'; // Local development server IP
+const API_BASE_URL = 'http://192.168.1.10:8081'; // Local development server IP
 
 export default function AuthModal({ visible, onClose, onSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -24,9 +24,9 @@ export default function AuthModal({ visible, onClose, onSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
       const data = await res.json();
-      
+
       if (!res.ok) {
         setError(data.error || 'Authentication failed');
       } else {

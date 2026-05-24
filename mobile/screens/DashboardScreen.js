@@ -9,7 +9,10 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import axios from 'axios';
 import {
   UploadCloud,
   FileText,
@@ -27,18 +30,16 @@ import {
   Calendar,
   AlertCircle,
   MoreVertical,
+  AlertTriangle,
 } from 'lucide-react-native';
 import SubscriptionsTab from './components/SubscriptionsTab';
 import FinHealthTab from './components/FinHealthTab';
 
 const { width } = Dimensions.get('window');
 
-const API_BASE_URL = 'http://192.168.1.47:8081';
+const API_BASE_URL = 'http://192.168.1.10:8081';
 
-const MOCK_FILES = [
-  { name: 'september_statement_2024.csv', size: '2.8 MB', type: 'CSV' },
-  { name: 'sbi_transactions_q3.pdf', size: '4.5 MB', type: 'PDF' },
-];
+const MOCK_FILES = [];
 
 export default function DashboardScreen({ tokenData }) {
   const [activeView, setActiveView] = useState('Overview'); // Overview, Subscriptions, FinHealth
@@ -55,32 +56,51 @@ export default function DashboardScreen({ tokenData }) {
   // Mappers
   const mapTransactions = (backendTxns = []) => {
     return backendTxns.map(tx => ({
-      ref: tx.txnId || Math.random().toString(36).substring(7),
+      ref: tx.txnId ? tx.txnId.substring(0, 8) : Math.random().toString(36).substring(7),
       date: tx.date || 'Unknown Date',
       customer: tx.rawNarration || 'Unknown',
-      amount: tx.amount || 0,
+      amount: Math.abs(tx.amount || 0),
       status: 'Completed',
       type: tx.type || 'Other',
-      isCredit: ['Income', 'Savings', 'Refund', 'Credit'].includes(tx.type)
+      isAnomaly: tx.mlData?.isAnomaly === true,
+      isCredit: (tx.type || '').toUpperCase().trim() === 'CREDIT' || ['Income', 'Savings', 'Refund', 'Credit'].includes((tx.type || '').trim())
     }));
   };
 
   const COLORS = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#f97316', '#8b5cf6'];
   const mapChartData = (breakdown = {}, totalExp = 1) => {
     let index = 0;
-    return Object.entries(breakdown).map(([label, amt]) => ({
-      label,
-      pct: Math.round((amt / (totalExp || 1)) * 100),
-      color: COLORS[index++ % COLORS.length]
-    })).sort((a, b) => b.pct - a.pct);
+    return Object.entries(breakdown).map(([label, amount]) => {
+      const rawPct = (amount / totalExp) * 100;
+      const numPct = Math.round(rawPct);
+      return {
+        label,
+        numPct: numPct,
+        pct: (rawPct > 0 && rawPct < 1) ? '<1' : numPct,
+        color: COLORS[index++ % COLORS.length]
+      };
+    }).sort((a, b) => b.numPct - a.numPct);
   };
 
   const mapSubscriptions = (recurring = []) => {
-    return recurring.map((tx, i) => ({
-      id: i.toString(),
-      name: tx.rawNarration,
-      category: tx.type,
-      amount: tx.amount,
+    const grouped = {};
+    recurring.forEach(tx => {
+      const key = tx.rawNarration ? tx.rawNarration.trim().toUpperCase() : 'UNKNOWN';
+      if (!grouped[key]) {
+        grouped[key] = {
+          id: key,
+          name: tx.rawNarration || 'Unknown',
+          category: tx.type,
+          amount: tx.amount,
+          count: 0
+        };
+      }
+      grouped[key].count += 1;
+      grouped[key].amount = tx.amount;
+    });
+
+    return Object.values(grouped).map((sub, i) => ({
+      ...sub,
       nextDue: 'Next Month',
       status: 'Active',
       icon: '🔄'
@@ -90,14 +110,104 @@ export default function DashboardScreen({ tokenData }) {
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [pastStatements, setPastStatements] = useState([]);
   const [activeDocId, setActiveDocId] = useState(null);
-  
+
   const [summaryMetrics, setSummaryMetrics] = useState({
     totalIncome: 0, totalExpense: 0, financialHealth: 'CALCULATING', categoryBreakdown: {}
   });
   const [subscriptionsList, setSubscriptionsList] = useState([]);
   const [aiSummaryText, setAiSummaryText] = useState('');
 
-  // Hydrate on startup
+  // --- AI Chat States ---
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const handleSendChat = async () => {
+    if (!chatMessage.trim() || !activeDocId) return;
+
+    const newChat = [...chatHistory, { role: 'user', content: chatMessage }];
+    setChatHistory(newChat);
+    setChatMessage('');
+    setIsChatLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/statements/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenData?.token}`
+        },
+        body: JSON.stringify({
+          docId: activeDocId,
+          question: chatMessage,
+          history: chatHistory.filter(msg => msg.role !== 'system').map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            content: msg.content
+          }))
+        })
+      });
+
+      if (response.ok) {
+        const text = await response.text();
+        setChatHistory([...newChat, { role: 'assistant', content: text }]);
+      } else {
+        setChatHistory([...newChat, { role: 'assistant', content: 'Sorry, I encountered an error answering that.' }]);
+      }
+    } catch (e) {
+      setChatHistory([...newChat, { role: 'assistant', content: 'Connection failed.' }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const [allDocs, setAllDocs] = useState([]);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+
+  const aggregateDocs = (docsToAggregate, monthLabel) => {
+    let mergedTx = [];
+    let mergedRecurring = [];
+    let combinedIncome = 0;
+    let combinedExpense = 0;
+    let combinedCategory = {};
+
+    docsToAggregate.forEach(d => {
+      if (d.transactions) {
+        mergedTx.push(...d.transactions);
+        const recurring = d.transactions.filter(t => t.mlData?.isRecurring === true);
+        mergedRecurring.push(...recurring);
+      }
+      if (d.summaryMetrics) {
+        combinedIncome += (d.summaryMetrics.totalIncome || 0);
+        combinedExpense += (d.summaryMetrics.totalExpense || 0);
+        if (d.summaryMetrics.categoryBreakdown) {
+          Object.entries(d.summaryMetrics.categoryBreakdown).forEach(([k, v]) => {
+            combinedCategory[k] = (combinedCategory[k] || 0) + v;
+          });
+        }
+      }
+    });
+
+    setTransactionHistory(mapTransactions(mergedTx));
+    setSubscriptionsList(mapSubscriptions(mergedRecurring));
+
+    let healthStatus = 'GOOD';
+    if (combinedIncome === 0 && combinedExpense > 0) healthStatus = 'CRITICAL';
+    else if (combinedExpense > combinedIncome) healthStatus = 'CRITICAL';
+    else if (combinedExpense > (combinedIncome * 0.8)) healthStatus = 'WARNING';
+    else healthStatus = 'HEALTHY';
+
+    setSummaryMetrics({
+      totalIncome: combinedIncome,
+      totalExpense: combinedExpense,
+      categoryBreakdown: combinedCategory,
+      financialHealth: healthStatus
+    });
+
+    setActiveMonth(monthLabel);
+    setShowResults(true);
+    setIsAnalyzing(false);
+  };
+
   useEffect(() => {
     const fetchMyStatements = async () => {
       try {
@@ -107,20 +217,38 @@ export default function DashboardScreen({ tokenData }) {
         if (res.ok) {
           const docs = await res.json();
           if (docs.length > 0) {
-            const latestDoc = docs[docs.length - 1];
-            if (latestDoc.status === 'COMPLETED') {
-               await loadCompletedDocument(latestDoc.id);
-            } else if (latestDoc.status === 'EXTRACTING_PDF' || latestDoc.status === 'PROCESSING') {
-               setActiveDocId(latestDoc.id);
-               setIsAnalyzing(true);
+            setAllDocs(docs);
+            aggregateDocs(docs, 'All-Time');
+
+            const completedDocs = docs.filter(d => d.status === 'COMPLETED');
+            if (completedDocs.length > 0) {
+              fetch(`${API_BASE_URL}/api/statements/status/${completedDocs[completedDocs.length - 1].id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
+                .then(r => r.json())
+                .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
             }
-            setPastStatements(docs.map(d => ({
-               id: d.id, month: d.id.substring(0,8), txCount: d.transactions?.length || 0, status: d.status
+
+            const getDocumentDateRange = (d, index) => {
+              if (!d.transactions || d.transactions.length === 0) return d.statementMonth && d.statementMonth !== 'Unknown' ? d.statementMonth : `Statement ${index + 1}`;
+              const dates = d.transactions.map(tx => new Date(tx.date).getTime()).filter(t => !isNaN(t));
+              if (dates.length === 0) return d.statementMonth && d.statementMonth !== 'Unknown' ? d.statementMonth : `Statement ${index + 1}`;
+              const minDate = new Date(Math.min(...dates)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              const maxDate = new Date(Math.max(...dates)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              return `${minDate} - ${maxDate}`;
+            };
+
+            setPastStatements(docs.map((d, i) => ({
+              id: d.id,
+              month: d.statementMonth && d.statementMonth !== 'Unknown' ? d.statementMonth : `Statement ${i + 1}`,
+              label: getDocumentDateRange(d, i),
+              txCount: d.transactions?.length || 0,
+              status: d.status
             })));
           }
+          setHasLoadedInitial(true);
         }
       } catch (e) {
         console.error(e);
+        setHasLoadedInitial(true);
       }
     };
     if (tokenData?.token) fetchMyStatements();
@@ -128,25 +256,21 @@ export default function DashboardScreen({ tokenData }) {
 
   const loadCompletedDocument = async (docId) => {
     try {
-      const docRes = await fetch(`${API_BASE_URL}/api/statements/${docId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/statements/my-statements`, {
         headers: { 'Authorization': `Bearer ${tokenData?.token}` }
       });
-      const docData = await docRes.json();
-      
-      const statRes = await fetch(`${API_BASE_URL}/api/statements/status/${docId}`, {
-        headers: { 'Authorization': `Bearer ${tokenData?.token}` }
-      });
-      const statData = await statRes.json();
+      if (res.ok) {
+        const docs = await res.json();
+        setAllDocs(docs);
+        const filtered = docs.filter(d => d.id === docId);
+        aggregateDocs(filtered, filtered[0]?.statementMonth || 'Current');
 
-      setTransactionHistory(mapTransactions(docData.transactions || []));
-      setSubscriptionsList(mapSubscriptions(docData.recurringTransactions || []));
-      
-      if (statData.summaryMetrics) setSummaryMetrics(statData.summaryMetrics);
-      if (statData.aiSummary) setAiSummaryText(statData.aiSummary);
-
-      setActiveMonth(docId.substring(0,8));
-      setShowResults(true);
-      setIsAnalyzing(false);
+        const statRes = await fetch(`${API_BASE_URL}/api/statements/status/${docId}`, {
+          headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+        });
+        const statData = await statRes.json();
+        if (statData.aiSummary) setAiSummaryText(statData.aiSummary);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -159,28 +283,28 @@ export default function DashboardScreen({ tokenData }) {
       pollInterval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE_URL}/api/statements/status/${activeDocId}`, {
-             headers: { 'Authorization': `Bearer ${tokenData?.token}` }
+            headers: { 'Authorization': `Bearer ${tokenData?.token}` }
           });
           const data = await res.json();
           if (data.status === 'EXTRACTING_PDF') {
-             setPollMessage('Extracting PDF & Anonymizing PII...');
+            setPollMessage('Extracting PDF & Anonymizing PII...');
           } else if (data.status === 'PROCESSING') {
-             setPollMessage('AI Categorization & Anomaly Detection running...');
+            setPollMessage('AI Categorization & Anomaly Detection running...');
           } else if (data.status === 'COMPLETED') {
-             clearInterval(pollInterval);
-             await loadCompletedDocument(activeDocId);
+            clearInterval(pollInterval);
+            await loadCompletedDocument(activeDocId);
           } else if (data.status === 'FAILED') {
-             clearInterval(pollInterval);
-             setIsAnalyzing(false);
-             Alert.alert('Error', 'Processing failed!');
+            clearInterval(pollInterval);
+            setIsAnalyzing(false);
+            Alert.alert('Error', 'Processing failed!');
           }
         } catch (e) {
           console.error(e);
         }
-      }, 3000); 
+      }, 3000);
     }
     return () => clearInterval(pollInterval);
-  }, [isAnalyzing, activeDocId]); 
+  }, [isAnalyzing, activeDocId]);
 
   // Dynamic calculations
   const startingBalance = 0;
@@ -196,19 +320,86 @@ export default function DashboardScreen({ tokenData }) {
 
   const chartData = mapChartData(summaryMetrics.categoryBreakdown, totalExpense);
 
-  const handleSelectFile = (file) => {
-    setSelectedFile(file);
+  const handleSelectFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/csv', 'text/comma-separated-values'],
+        copyToCacheDirectory: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        setSelectedFile({
+          uri: file.uri,
+          name: file.name,
+          size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+          type: file.mimeType || 'application/octet-stream'
+        });
+      }
+    } catch (err) {
+      console.error("Error picking document:", err);
+      Alert.alert('Error', 'Failed to pick document');
+    }
   };
 
-  const handleProcessFile = () => {
-    // Native document upload not fully supported here without expo-document-picker
-    // Leaving mock behavior or simply alert user for mobile version
-    Alert.alert("Upload not supported in mock client. Please use Web client to upload statements.");
-    setSelectedFile(null);
+  const handleProcessFile = async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      // Use the standard RN FormData syntax. Axios (via XMLHttpRequest) handles this perfectly.
+      formData.append('file', {
+        uri: selectedFile.uri,
+        name: selectedFile.name,
+        type: selectedFile.type
+      });
+
+      const response = await axios.post(`${API_BASE_URL}/api/statements/upload`, formData, {
+        headers: {
+          'Authorization': `Bearer ${tokenData?.token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const data = response.data;
+      setIsUploading(false);
+
+      if (data.documentId) {
+        setActiveDocId(data.documentId);
+        setIsAnalyzing(true);
+      } else {
+        Alert.alert("Error", data.error || "Upload failed");
+        setSelectedFile(null);
+      }
+    } catch (e) {
+      console.error("Upload error details:", e?.response?.data || e.message);
+      setIsUploading(false);
+
+      if (e.response) {
+        Alert.alert("Upload Error", `Status: ${e.response.status}\n\nResponse: ${JSON.stringify(e.response.data).substring(0, 100)}`);
+      } else {
+        Alert.alert("Error", "Network error during upload");
+      }
+      setSelectedFile(null);
+    }
   };
 
-  const loadPastStatement = (id) => {
-    loadCompletedDocument(id);
+  const loadPastStatement = (id, monthLabel) => {
+    if (id === 'All-Time') {
+      aggregateDocs(allDocs, 'All-Time');
+    } else {
+      const filtered = allDocs.filter(d => d.id === id);
+      aggregateDocs(filtered, monthLabel);
+
+      const doc = filtered[0];
+      if (doc && doc.status === 'COMPLETED') {
+        fetch(`${API_BASE_URL}/api/statements/status/${doc.id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
+          .then(r => r.json())
+          .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
+      }
+    }
   };
 
   const resetUploader = () => {
@@ -222,7 +413,6 @@ export default function DashboardScreen({ tokenData }) {
   // Filter transactions
   const filteredTransactions = transactionHistory.filter((tx) => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Savings') return tx.type.toLowerCase() === 'savings';
     if (activeTab === 'Credit') return tx.isCredit === true;
     if (activeTab === 'Debit') {
       if (tx.isCredit) return false;
@@ -248,7 +438,7 @@ export default function DashboardScreen({ tokenData }) {
 
   return (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.contentContainer}>
-      
+
       {/* ── TOP SEGMENT TABS ── */}
       <View style={styles.segmentBar}>
         {['Overview', 'Subscriptions', 'FinHealth'].map((tab) => (
@@ -273,25 +463,22 @@ export default function DashboardScreen({ tokenData }) {
             <View style={styles.uploaderCard}>
               <Text style={styles.cardHeaderTitle}>Process New Data</Text>
               <Text style={styles.cardHeaderSubtitle}>
-                Select a statement template to simulate analysis.
+                Select a bank statement to process.
               </Text>
 
               {!selectedFile ? (
                 <View style={styles.uploaderList}>
-                  {MOCK_FILES.map((file, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={styles.fileSelectorItem}
-                      onPress={() => handleSelectFile(file)}
-                      activeOpacity={0.7}
-                    >
-                      <UploadCloud size={20} color="#4f46e5" />
-                      <View style={styles.fileItemText}>
-                        <Text style={styles.fileItemName}>{file.name}</Text>
-                        <Text style={styles.fileItemSize}>{file.type} · {file.size}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  <TouchableOpacity
+                    style={styles.fileSelectorItem}
+                    onPress={handleSelectFile}
+                    activeOpacity={0.7}
+                  >
+                    <UploadCloud size={20} color="#4f46e5" />
+                    <View style={styles.fileItemText}>
+                      <Text style={styles.fileItemName}>Upload Statement</Text>
+                      <Text style={styles.fileItemSize}>Tap to select PDF or CSV</Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.selectedFileView}>
@@ -409,6 +596,20 @@ export default function DashboardScreen({ tokenData }) {
           <View style={styles.statementsHistoryCard}>
             <Text style={styles.statementsHeaderTitle}>Processed Statements</Text>
             <View style={styles.statementsList}>
+              <TouchableOpacity
+                style={[styles.statementItemBtn, activeMonth === 'All-Time' && styles.statementItemBtnActive]}
+                onPress={() => loadPastStatement('All-Time')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statementTextCol}>
+                  <Text style={[styles.statementMonthText, activeMonth === 'All-Time' && styles.statementMonthTextActive]}>All-Time</Text>
+                  <Text style={styles.statementTxnText}>Combined Ledger</Text>
+                </View>
+                <View style={styles.statementBadge}>
+                  <Text style={[styles.statementBadgeText, { color: '#059669', backgroundColor: '#d1fae5' }]}>AGGREGATED</Text>
+                </View>
+              </TouchableOpacity>
+
               {pastStatements.map((stmt, i) => (
                 <TouchableOpacity
                   key={i}
@@ -416,7 +617,7 @@ export default function DashboardScreen({ tokenData }) {
                     styles.statementItemBtn,
                     activeMonth === stmt.month && styles.statementItemBtnActive,
                   ]}
-                  onPress={() => loadPastStatement(stmt.month)}
+                  onPress={() => loadPastStatement(stmt.id, stmt.month)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.statementTextCol}>
@@ -437,6 +638,19 @@ export default function DashboardScreen({ tokenData }) {
               ))}
             </View>
           </View>
+
+          {/* ANOMALY BANNER */}
+          {transactionHistory.some(tx => tx.isAnomaly) && (
+            <View style={{ backgroundColor: '#fee2e2', borderColor: '#fca5a5', borderWidth: 1, padding: 16, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+              <AlertTriangle size={24} color="#ef4444" style={{ marginRight: 12 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#991b1b' }}>Anomalous Transactions Detected</Text>
+                <Text style={{ fontSize: 13, color: '#b91c1c', marginTop: 4 }}>
+                  Our AI Autoencoder has flagged {transactionHistory.filter(tx => tx.isAnomaly).length} transaction(s) as highly unusual based on your spending patterns. Please review them below.
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* BALANCES SUMMARY CARD */}
           <View style={styles.balancesContainer}>
@@ -466,7 +680,7 @@ export default function DashboardScreen({ tokenData }) {
           <View style={styles.transactionsCard}>
             <View style={styles.transactionsHeaderRow}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsScroll}>
-                {['All', 'Credit', 'Debit', 'Savings'].map((tab) => (
+                {['All', 'Credit', 'Debit'].map((tab) => (
                   <TouchableOpacity
                     key={tab}
                     style={[
@@ -525,20 +739,25 @@ export default function DashboardScreen({ tokenData }) {
             <View style={styles.transactionsList}>
               {filteredTransactions.length > 0 ? (
                 filteredTransactions.map((tx) => (
-                  <View key={tx.ref} style={styles.txRow}>
+                  <View key={tx.ref} style={[styles.txRow, tx.isAnomaly && { backgroundColor: '#fef2f2' }]}>
                     <View
                       style={[
                         styles.txAvatar,
-                        { backgroundColor: tx.isCredit ? '#eef2ff' : '#fff7ed' },
+                        { backgroundColor: tx.isAnomaly ? '#ef4444' : (tx.isCredit ? '#eef2ff' : '#fff7ed') },
                       ]}
                     >
-                      <Text style={[styles.txAvatarText, { color: tx.isCredit ? '#4f46e5' : '#d97706' }]}>
+                      <Text style={[styles.txAvatarText, { color: tx.isAnomaly ? '#fff' : (tx.isCredit ? '#4f46e5' : '#d97706') }]}>
                         {tx.customer.charAt(0)}
                       </Text>
                     </View>
-                    <View style={styles.txMetaCol}>
+                    <View style={[styles.txMetaCol, { paddingRight: 8 }]}>
                       <Text style={styles.txNameText}>{tx.customer}</Text>
-                      <Text style={styles.txDateText}>{tx.date}</Text>
+                      {tx.isAnomaly && (
+                        <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginTop: 4 }}>
+                          <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: 'bold' }}>⚠️ ANOMALY</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.txDateText, { marginTop: tx.isAnomaly ? 4 : 0 }]}>{tx.date}</Text>
                     </View>
                     <View style={styles.txAmountCol}>
                       <Text
@@ -566,19 +785,25 @@ export default function DashboardScreen({ tokenData }) {
 
       {activeView === 'Subscriptions' && (
         <View style={styles.subTabWrapper}>
-          <SubscriptionsTab 
-            formatCurrency={formatCurrency} 
+          <SubscriptionsTab
+            formatCurrency={formatCurrency}
             subscriptionsList={subscriptionsList}
-            totalRecurringExpense={summaryMetrics.totalRecurringExpense || 0}
+            totalRecurringExpense={subscriptionsList.reduce((sum, sub) => sum + (sub.amount || 0), 0)}
           />
         </View>
       )}
 
       {activeView === 'FinHealth' && (
         <View style={styles.subTabWrapper}>
-          <FinHealthTab 
-            summaryMetrics={summaryMetrics} 
-            aiSummaryText={aiSummaryText} 
+          <FinHealthTab
+            summaryMetrics={summaryMetrics}
+            aiSummaryText={aiSummaryText}
+            activeDocId={activeDocId}
+            chatMessage={chatMessage}
+            setChatMessage={setChatMessage}
+            chatHistory={chatHistory}
+            isChatLoading={isChatLoading}
+            handleSendChat={handleSendChat}
           />
         </View>
       )}
@@ -597,7 +822,7 @@ export default function DashboardScreen({ tokenData }) {
               <View style={[styles.riskBadge, styles.lowRiskBg]}>
                 <Text style={[styles.riskText, styles.lowRiskColor]}>Low Risk</Text>
               </View>
-              <Text style={styles.bankNameText}>ICICI Prudential</Text>
+              <Image source={require('../assets/icici.jpeg')} style={{ width: 80, height: 24 }} resizeMode="contain" />
             </View>
             <Text style={styles.investNameTitle}>ICICI Prudential Liquid Fund</Text>
             <Text style={styles.investDescText}>
@@ -617,7 +842,7 @@ export default function DashboardScreen({ tokenData }) {
               <View style={[styles.riskBadge, styles.medRiskBg]}>
                 <Text style={[styles.riskText, styles.medRiskColor]}>Medium Risk</Text>
               </View>
-              <Text style={styles.bankNameText}>HDFC Bank</Text>
+              <Image source={require('../assets/hdfc.jpeg')} style={{ width: 80, height: 24 }} resizeMode="contain" />
             </View>
             <Text style={styles.investNameTitle}>HDFC Index Fund (Nifty 50)</Text>
             <Text style={styles.investDescText}>
@@ -631,17 +856,17 @@ export default function DashboardScreen({ tokenData }) {
           {/* Card 3 */}
           <View style={styles.investmentCard}>
             <View style={styles.investmentCardHeader}>
-              <View style={[styles.riskBadge, styles.zeroRiskBg]}>
-                <Text style={[styles.riskText, styles.zeroRiskColor]}>Zero Risk</Text>
+              <View style={[styles.riskBadge, { backgroundColor: '#fee2e2' }]}>
+                <Text style={[styles.riskText, { color: '#b91c1c' }]}>High Risk</Text>
               </View>
-              <Text style={styles.bankNameText}>India Post</Text>
+              <Image source={require('../assets/tatamf.jpeg')} style={{ width: 80, height: 24 }} resizeMode="contain" />
             </View>
-            <Text style={styles.investNameTitle}>Post Office Time Deposit</Text>
+            <Text style={styles.investNameTitle}>Tata Digital India Fund</Text>
             <Text style={styles.investDescText}>
-              Lock in sovereign-backed, guaranteed returns up to 7.5% p.a. Complete peace of mind.
+              Capitalize on the IT sector's growth with historical 18-20% p.a. returns over 5 years. Ideal for long-term wealth creation.
             </Text>
             <TouchableOpacity style={styles.investActionBtn} activeOpacity={0.7}>
-              <Text style={styles.investActionBtnText}>View Rates</Text>
+              <Text style={styles.investActionBtnText}>Explore Fund</Text>
             </TouchableOpacity>
           </View>
         </View>

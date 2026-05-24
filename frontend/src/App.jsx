@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
 import Dashboard from './components/DashBoard';
+import Footer from './components/Footer';
 
 export default function App() {
   const [tokenData, setTokenData] = useState(() => {
@@ -24,12 +25,15 @@ export default function App() {
   };
 
   return (
-    <>
-      {tokenData ? (
-        <Dashboard onLogout={handleLogout} tokenData={tokenData} />
-      ) : (
-        <HomePage onLogin={handleLogin} />
-      )}
-    </>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div style={{ flex: 1 }}>
+        {tokenData ? (
+          <Dashboard onLogout={handleLogout} tokenData={tokenData} />
+        ) : (
+          <HomePage onLogin={handleLogin} />
+        )}
+      </div>
+      <Footer />
+    </div>
   );
 }

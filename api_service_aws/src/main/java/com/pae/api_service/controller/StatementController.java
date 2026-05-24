@@ -155,4 +155,52 @@ public class StatementController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    // 5. Chat with Document Context
+    @PostMapping("/{id}/chat")
+    public ResponseEntity<java.util.Map<String, String>> chatWithDocument(@PathVariable String id, @RequestBody com.pae.api_service.dto.ChatRequest chatRequest) {
+        try {
+            StatementDocument doc = dynamoDbService.getStatement(id);
+            if (doc == null) return ResponseEntity.notFound().build();
+
+            // Build simple context from metrics
+            String context = "Client total income: " + doc.getSummaryMetrics().getTotalIncome() + 
+                             ", total expense: " + doc.getSummaryMetrics().getTotalExpense() + 
+                             ". Category Breakdown: " + doc.getSummaryMetrics().getCategoryBreakdown().toString() + ".";
+
+            software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient bedrockClient = software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient.create();
+            
+            // Build Bedrock Converse Request (AWS SDK v2)
+            java.util.List<software.amazon.awssdk.services.bedrockruntime.model.Message> messages = new java.util.ArrayList<>();
+            
+            // System prompt + User msg
+            messages.add(software.amazon.awssdk.services.bedrockruntime.model.Message.builder()
+                .role(software.amazon.awssdk.services.bedrockruntime.model.ConversationRole.USER)
+                .content(software.amazon.awssdk.services.bedrockruntime.model.ContentBlock.fromText("Context: " + context + "\n\nUser Question: " + chatRequest.getMessage()))
+                .build());
+
+            java.util.List<software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock> systemBlocks = java.util.Collections.singletonList(
+                software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock.builder()
+                    .text("You are a professional financial advisor. You MUST decline to answer any questions unrelated to the user's financial context or general personal finance (e.g., celebrities, pop culture, politics, sports, coding). Reply professionally stating that you can only assist with personal finance.")
+                    .build()
+            );
+
+            software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest request = software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest.builder()
+                .modelId("google.gemma-3-27b-it")
+                .system(systemBlocks)
+                .messages(messages)
+                .build();
+
+            software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse response = bedrockClient.converse(request);
+            String reply = response.output().message().content().get(0).text();
+
+            java.util.Map<String, String> res = new java.util.HashMap<>();
+            res.put("reply", reply);
+            return ResponseEntity.ok(res);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
 }

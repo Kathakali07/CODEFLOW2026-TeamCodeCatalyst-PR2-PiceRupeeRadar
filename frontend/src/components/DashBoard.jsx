@@ -8,6 +8,7 @@ import {
 // Import your new components (make sure paths match your folder structure)
 import TransactionTable from './TransactionTable';
 import InvestmentRecommendations from './InvestmentRecommendations';
+import TypewriterText from './TypewriterText';
 
 export default function Dashboard({ onLogout, tokenData }) {
   // --- UI & UPLOAD STATES ---
@@ -96,6 +97,11 @@ export default function Dashboard({ onLogout, tokenData }) {
   });
   const [subscriptionsList, setSubscriptionsList] = useState([]);
   const [aiSummaryText, setAiSummaryText] = useState('');
+  
+  // Chatbot States
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const [allDocs, setAllDocs] = useState([]);
 
@@ -318,12 +324,14 @@ export default function Dashboard({ onLogout, tokenData }) {
   const loadPastStatement = (monthLabel) => {
     if (monthLabel === 'All-Time') {
       aggregateDocs(allDocs, 'All-Time');
+      setActiveDocId(null);
     } else {
       const filtered = allDocs.filter(d => (d.statementMonth && d.statementMonth !== 'Unknown' ? d.statementMonth : `Statement`) === monthLabel);
       aggregateDocs(filtered, monthLabel);
       
       const doc = filtered[filtered.length - 1];
       if (doc && doc.status === 'COMPLETED') {
+        setActiveDocId(doc.id);
         fetch(`${API_URL}/api/statements/status/${doc.id}`, { headers: { 'Authorization': `Bearer ${tokenData?.token}` } })
           .then(r => r.json())
           .then(d => { if (d.aiSummary) setAiSummaryText(d.aiSummary); });
@@ -341,7 +349,20 @@ export default function Dashboard({ onLogout, tokenData }) {
     return `${minDate} - ${maxDate}`;
   };
 
-  const trendData = [...allDocs].filter(d => d.status === 'COMPLETED').sort((a, b) => (a.statementMonth || '').localeCompare(b.statementMonth || '')).slice(-6).map(d => {
+  const uniqueDocs = [];
+  const monthMap = new Set();
+  [...allDocs].filter(d => d.status === 'COMPLETED')
+    .sort((a, b) => (a.statementMonth || '').localeCompare(b.statementMonth || ''))
+    .reverse()
+    .forEach(d => {
+      const m = d.statementMonth || 'Unknown';
+      if (!monthMap.has(m)) {
+        monthMap.add(m);
+        uniqueDocs.push(d);
+      }
+    });
+
+  const trendData = uniqueDocs.slice(0, 6).reverse().map(d => {
     let score = 0;
     if (d.summaryMetrics?.financialHealth === 'HEALTHY') score = 82;
     else if (d.summaryMetrics?.financialHealth === 'WARNING') score = 55;
@@ -351,7 +372,33 @@ export default function Dashboard({ onLogout, tokenData }) {
 
   const resetUploader = () => {
     setShowResults(false); setSelectedFile(null); setTransactionHistory([]);
-    setActiveMonth('Current'); setActiveTab('All');
+    setActiveMonth('Current'); setActiveTab('All'); setChatHistory([]);
+  };
+
+  const handleSendChat = async () => {
+    if (!chatMessage.trim() || !activeDocId) return;
+    
+    const newHistory = [...chatHistory, { role: 'user', content: chatMessage }];
+    setChatHistory(newHistory);
+    setChatMessage('');
+    setIsChatLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/statements/${activeDocId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenData?.token}`
+        },
+        body: JSON.stringify({ message: chatMessage, history: newHistory })
+      });
+      const data = await res.json();
+      setChatHistory([...newHistory, { role: 'assistant', content: data.reply || 'Sorry, I could not process that.' }]);
+    } catch (e) {
+      console.error(e);
+      setChatHistory([...newHistory, { role: 'assistant', content: 'Network error. Could not reach AI Advisor.' }]);
+    }
+    setIsChatLoading(false);
   };
 
   return (
@@ -615,10 +662,54 @@ export default function Dashboard({ onLogout, tokenData }) {
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 4 }}><span style={{ fontSize: 42, fontWeight: 900, color: summaryMetrics.financialHealth === 'HEALTHY' ? '#059669' : (summaryMetrics.financialHealth === 'WARNING' ? '#d97706' : '#dc2626'), lineHeight: 1 }}>{summaryMetrics.financialHealth === 'HEALTHY' ? '82' : (summaryMetrics.financialHealth === 'WARNING' ? '55' : (summaryMetrics.financialHealth === 'CRITICAL' ? '30' : '--'))}</span><span style={{ fontSize: 16, fontWeight: 700, color: '#94a3b8' }}>/ 100</span></div>
               </div>
 
-              {aiSummaryText && (
-                <div style={{ background: 'linear-gradient(135deg, #f3f0ff, #e0e7ff)', padding: '20px', borderRadius: '12px', marginBottom: '32px', border: '1px solid #c7d2fe' }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#4f46e5', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><BrainCircuit size={16} /> Gemini AI Advisor Insight</div>
-                  <p style={{ fontSize: 14, color: '#1e1b4b', lineHeight: 1.6, margin: 0 }}>{aiSummaryText}</p>
+              {/* COMBINED ADVISOR & CHATBOT UI */}
+              {(aiSummaryText || activeDocId) && (
+                <div style={{ background: 'linear-gradient(135deg, #f3f0ff, #e0e7ff)', padding: '20px', borderRadius: '12px', marginBottom: '32px', border: '1px solid #c7d2fe', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#4f46e5', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}><BrainCircuit size={16} /> Gemini AI Advisor</div>
+                  
+                  {/* Initial Summary Text */}
+                  {aiSummaryText && (
+                    <p style={{ fontSize: 14, color: '#1e1b4b', lineHeight: 1.6, margin: 0, marginBottom: chatHistory.length > 0 ? 16 : 0, paddingBottom: chatHistory.length > 0 ? 16 : 0, borderBottom: chatHistory.length > 0 ? '1px solid rgba(79, 70, 229, 0.2)' : 'none' }}>
+                      {aiSummaryText}
+                    </p>
+                  )}
+
+                  {/* Chat History (Expands if there is history) */}
+                  {activeDocId && chatHistory.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
+                      {chatHistory.map((msg, idx) => (
+                        <div key={idx} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', background: msg.role === 'user' ? '#4f46e5' : '#fff', color: msg.role === 'user' ? '#fff' : '#1e1b4b', padding: '12px 16px', borderRadius: '12px', maxWidth: '85%', fontSize: 13, lineHeight: 1.5, borderBottomRightRadius: msg.role === 'user' ? 2 : 12, borderBottomLeftRadius: msg.role !== 'user' ? 2 : 12, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                          {msg.role === 'assistant' ? (
+                            <TypewriterText text={msg.content} isTyping={idx === chatHistory.length - 1} />
+                          ) : (
+                            msg.content
+                          )}
+                        </div>
+                      ))}
+                      {isChatLoading && (
+                        <div style={{ alignSelf: 'flex-start', background: '#fff', color: '#64748b', padding: '12px 16px', borderRadius: '12px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                          <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} /> Thinking...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Chat Input box ALWAYS visible if activeDocId exists */}
+                  {activeDocId && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: aiSummaryText && chatHistory.length === 0 ? 16 : 0 }}>
+                      <input 
+                        type="text" 
+                        value={chatMessage} 
+                        onChange={e => setChatMessage(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSendChat()}
+                        placeholder="Ask Gemini to analyze your spending..." 
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(79, 70, 229, 0.3)', outline: 'none', fontSize: 13, background: 'rgba(255, 255, 255, 0.7)' }}
+                      />
+                      <button onClick={handleSendChat} disabled={isChatLoading} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '0 24px', borderRadius: '8px', fontWeight: 700, cursor: isChatLoading ? 'default' : 'pointer', opacity: isChatLoading ? 0.7 : 1, transition: 'all 0.2s' }}>
+                        Send
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
