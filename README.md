@@ -22,16 +22,16 @@ To prevent abuse, resource exhaustion, and potential DDoS attacks, the backend i
 
 ---
 
-## 🧠 Explicit LLM Boundaries (Gemini AI)
+## 🧠 Explicit LLM Boundaries (Gemma via AWS Bedrock)
 
 While P.A.E features advanced artificial intelligence, we enforce strict, deterministic boundaries on where large language models (LLMs) are utilized. 
 
-**The Gemini LLM is used EXCLUSIVELY for:**
+**The Gemma LLM (served via AWS Bedrock) is used EXCLUSIVELY for:**
 1. **OCR / Statement Parsing:** Extracting raw, unstructured text from complex bank statement PDFs into structured data.
 2. **AI Summary:** Generating human-readable, high-level summaries of a user's financial health based on parsed data.
 3. **Interactive Chatbot:** Powering the conversational UI where users can query their spending patterns. 
 
-*Note: All other critical operations—including transaction categorizations, mathematical ledger aggregations, anomaly detection (using autoencoders), and subscription matching—are handled by dedicated, deterministic ML models or strict code logic, ensuring 100% financial accuracy free from LLM hallucinations.*
+*Note: All other critical operations—including transaction categorizations (using DistilBERT), mathematical ledger aggregations, anomaly detection (using autoencoders), and subscription matching—are handled by dedicated, deterministic ML models or strict code logic, ensuring 100% financial accuracy free from LLM hallucinations.*
 
 ---
 

@@ -237,20 +237,20 @@ export default function HomePage({ onLogin }) {
     {
       icon: <Network size={22} color="#0ea5e9" />,
       bg: '#e0f2fe',
-      title: "RabbitMQ Event Broker",
-      description: "Asynchronous message queuing ensures zero data loss and prevents bottlenecks during heavy ML workloads.",
+      title: "AWS SQS Event Broker",
+      description: "Fully managed message queuing ensures zero data loss and prevents bottlenecks during heavy ML workloads.",
     },
     {
       icon: <BrainCircuit size={22} color="#f97316" />,
       bg: '#fff7ed',
       title: "FastAPI ML Execution",
-      description: "Dedicated Python layer running BiLSTM NER categorization and Autoencoder anomaly detection.",
+      description: "Dedicated Python layer running DistilBERT categorization and Autoencoder anomaly detection.",
     },
     {
       icon: <Database size={22} color="#059669" />,
       bg: '#ecfdf5',
-      title: "MongoDB State Manager",
-      description: "The single source of truth. All microservices read and write to a centralized NoSQL document store.",
+      title: "Amazon DynamoDB",
+      description: "The single source of truth. All microservices read and write to a fully managed NoSQL database for single-digit millisecond performance.",
     },
   ];
 
@@ -366,66 +366,6 @@ export default function HomePage({ onLogin }) {
         </div>
       </section>
 
-    
-      {/* ── FOOTER ── */}
-      <footer id="about-us" style={{ borderTop: '0.5px solid #e8e8e8', padding: '48px 24px', background: '#fafafa' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 40 }}>
-
-          {/* Brand */}
-          <div style={{ flex: '1 1 180px' }}>
-            <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.04em', color: '#111', marginBottom: 8 }}>
-              PR<sup style={{ color: '#7850f0', fontSize: 16, verticalAlign: 'super' }}>2</sup>
-            </div>
-            <div style={{ fontSize: 13, color: '#888', maxWidth: 1500, lineHeight: 1.6 }}><b>Pice Rupee Radar</b> — AI-driven financial analysis for bank statements.</div>
-            <div style={{ marginTop: 14, fontSize: 12, color: '#bbb' }}>Engineered by a specialized team of 4.</div>
-          </div>
-
-            {/* The Team */}
-            <div style={{ flex: '1 1 220px' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#111', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>The Team</div>
-              {teamMembers.map((member, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 13, color: '#111', fontWeight: 700, lineHeight: 1.3 }}>{member.name}</span>
-                    <a
-                      href={'mailto:' + member.email}
-                      style={{ fontSize: 11, color: '#aaa', fontWeight: 400, transition: 'color 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.color = '#7850f0'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#aaa'}
-                    >{member.email}</a>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-                    <a href={member.github} target="_blank" rel="noreferrer" title="GitHub"
-                      style={{ color: '#bbb', display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.color = '#111'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
-                    ><GitHubIcon size={16} /></a>
-                    <a href={member.linkedin} target="_blank" rel="noreferrer" title="LinkedIn"
-                      style={{ color: '#bbb', display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.color = '#0077b5'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
-                    ><LinkedInIcon size={16} /></a>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          {/* Legal */}
-          <div style={{ flex: '1 1 120px' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#111', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 16 }}>Legal</div>
-            {['Terms & Conditions', 'Privacy Policy'].map(l => (
-              <div key={l} style={{ marginBottom: 10 }}>
-                <a href="#"
-                  style={{ fontSize: 13, color: '#666', fontWeight: 500, transition: 'color 0.15s' }}
-                  onMouseEnter={e => e.target.style.color = '#7850f0'}
-                  onMouseLeave={e => e.target.style.color = '#666'}
-                >{l}</a>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </footer>
     </div>
   );
 }
