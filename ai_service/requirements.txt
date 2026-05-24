@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+google-cloud-firestore
+google-cloud-pubsub
+tensorflow
+scikit-learn
+pandas
+numpy
+transformers
+torch
+google-generativeai
+python-dotenv
